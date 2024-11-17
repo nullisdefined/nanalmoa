@@ -1,0 +1,36 @@
+{
+  "name": "nanalmoa",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "start:client": "yarn workspace client dev",
+    "start:server": "yarn workspace server start:dev",
+    "build:client": "yarn workspace client build",
+    "build:server": "yarn workspace server build",
+    "format": "prettier --write .",
+    "check-format": "prettier --check .",
+    "lint:client": "yarn workspace client lint",
+    "lint:server": "yarn workspace server lint",
+    "lint:all": "yarn lint:client && yarn lint:server"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.15.0",
+    "@nestjs/typeorm": "^10.0.2",
+    "@typescript-eslint/eslint-plugin": "^5.59.0",
+    "@typescript-eslint/parser": "^5.59.0",
+    "eslint": "^9.5.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "globals": "^15.12.0",
+    "prettier": "^3.3.3",
+    "prettier-plugin-tailwindcss": "^0.6.8",
+    "typeorm": "^0.3.20"
+  }
+}
