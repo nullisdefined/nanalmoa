@@ -60,7 +60,7 @@ jobs:
 
       # 클라이언트 빌드 실행
       - name: Build Client
-        run: yarn client build
+        run: yarn build:client
 
       # 여기에 클라이언트 배포 관련 스텝 추가해야함.
 
@@ -80,6 +80,6 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build Server
-        run: yarn server build
+        run: yarn build:server
 
       # 여기에 서버 배포 관련 스텝 추가해야함.
