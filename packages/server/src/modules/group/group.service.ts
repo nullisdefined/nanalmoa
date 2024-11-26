@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { CreateGroupDto } from './dto/create-group.dto'
-import { InjectRepository } from '@nestjs/typeorm'
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
 import { DataSource, In, Repository } from 'typeorm'
 import { Group } from '@/entities/group.entity'
 import { UserGroup } from '@/entities/user-group.entity'
@@ -38,6 +38,7 @@ export class GroupService {
     private groupInvitationRepository: Repository<GroupInvitation>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectDataSource()
     private dataSource: DataSource,
     private usersService: UsersService,
     @InjectRepository(GroupSchedule)
