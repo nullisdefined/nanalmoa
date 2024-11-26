@@ -30,6 +30,7 @@ import { UpdateUserDto } from './dto/update-user.dto'
 import { AuthService } from '@/auth/auth.service'
 import { DataSource, Repository } from 'typeorm'
 import { AuthProvider } from '@/entities/auth.entity'
+import { InjectDataSource } from '@nestjs/typeorm'
 
 @ApiTags('Users')
 @Controller('users')
@@ -39,6 +40,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly authService: AuthService,
+    @InjectDataSource()
     private dataSource: DataSource,
   ) {}
 
