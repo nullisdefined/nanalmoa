@@ -244,6 +244,16 @@ export class SchedulesService {
       isRecurring: createScheduleDto.isRecurring,
     })
 
+    if (schedule.isAllDay) {
+      ;[schedule.startDate, schedule.endDate] = this.adjustDateForAllDay(
+        schedule.startDate,
+        schedule.endDate,
+      )
+    }
+
+    // 먼저 schedule을 저장
+    const savedSchedule = await this.schedulesRepository.save(schedule)
+
     if (schedule.isRecurring) {
       const recurring = this.recurringRepository.create({
         repeatType: createScheduleDto.repeatType,
@@ -252,19 +262,14 @@ export class SchedulesService {
         recurringDaysOfWeek: createScheduleDto.recurringDaysOfWeek,
         recurringDayOfMonth: createScheduleDto.recurringDayOfMonth,
         recurringMonthOfYear: createScheduleDto.recurringMonthOfYear,
-        schedule,
+        scheduleId: savedSchedule.scheduleId, // 저장된 schedule의 ID를 참조
       })
-      schedule.recurring = recurring
+
+      // recurring 레코드 저장
+      const savedRecurring = await this.recurringRepository.save(recurring)
+      savedSchedule.recurring = savedRecurring
     }
 
-    if (schedule.isAllDay) {
-      ;[schedule.startDate, schedule.endDate] = this.adjustDateForAllDay(
-        schedule.startDate,
-        schedule.endDate,
-      )
-    }
-
-    const savedSchedule = await this.schedulesRepository.save(schedule)
     if (createScheduleDto.groupInfo && createScheduleDto.groupInfo.length > 0) {
       await this.groupService.linkScheduleToGroupsAndUsers(
         savedSchedule,
@@ -735,18 +740,16 @@ export class SchedulesService {
     const expandedSchedules: Schedule[] = []
 
     for (const schedule of schedules) {
+      const recurring = schedule.recurring
       // recurring이 없는 경우 스킵
-      if (!schedule.recurring) continue
+      if (!recurring) continue
 
-      if (
-        schedule.recurring.repeatEndDate &&
-        schedule.recurring.repeatEndDate < startDate
-      ) {
+      if (recurring.repeatEndDate && recurring.repeatEndDate < startDate) {
         continue
       }
 
       let currentDate = new Date(schedule.startDate)
-      const scheduleEndDate = schedule.recurring.repeatEndDate || endDate
+      const scheduleEndDate = recurring.repeatEndDate || endDate
 
       while (currentDate <= scheduleEndDate && currentDate <= endDate) {
         if (this.isOccurrenceDate(schedule, currentDate)) {
@@ -787,27 +790,26 @@ export class SchedulesService {
 
   private getNextOccurrenceDate(schedule: Schedule, currentDate: Date): Date {
     const nextDate = new Date(currentDate)
-    const interval = schedule.recurring.recurringInterval || 1
+    const recurring = schedule.recurring
+    const interval = recurring.recurringInterval || 1
 
-    switch (schedule.recurring.repeatType) {
+    switch (recurring.repeatType) {
       case 'daily':
         nextDate.setDate(nextDate.getDate() + interval)
         break
       case 'weekly':
         do {
           nextDate.setDate(nextDate.getDate() + 1)
-        } while (
-          !schedule.recurring.recurringDaysOfWeek.includes(nextDate.getDay())
-        )
+        } while (!recurring.recurringDaysOfWeek.includes(nextDate.getDay()))
         break
       case 'monthly':
         nextDate.setMonth(nextDate.getMonth() + interval)
-        nextDate.setDate(schedule.recurring.recurringDayOfMonth)
+        nextDate.setDate(recurring.recurringDayOfMonth)
         break
       case 'yearly':
         nextDate.setFullYear(nextDate.getFullYear() + interval)
-        nextDate.setMonth(schedule.recurring.recurringMonthOfYear)
-        nextDate.setDate(schedule.recurring.recurringDayOfMonth)
+        nextDate.setMonth(recurring.recurringMonthOfYear)
+        nextDate.setDate(recurring.recurringDayOfMonth)
         break
     }
 
