@@ -7,25 +7,32 @@
   "workspaces": [
     "packages/*"
   ],
+  "type": "module",
   "scripts": {
     "start:client": "yarn workspace client dev",
     "start:server": "yarn workspace server start:dev",
     "build:client": "yarn workspace client build",
     "build:server": "yarn workspace server build",
-    "format": "prettier --write .",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "check-format": "prettier --check .",
-    "lint:client": "yarn workspace client lint",
-    "lint:server": "yarn workspace server lint",
-    "lint:all": "yarn lint:client && yarn lint:server"
+    "lint:all": "yarn eslint --fix",
+    "lint:client": "yarn workspace client lint --fix",
+    "lint:server": "yarn workspace server lint --fix"
   },
   "dependencies": {
     "axios": "^1.7.7"
   },
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "globals": "^15.12.0",
     "prettier": "^3.3.3",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.16.0"
   },
   "packageManager": "yarn@1.22.21"
 }
