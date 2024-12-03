@@ -209,8 +209,12 @@ export class SchedulesService {
       createScheduleDto.categoryId ?? 7,
     )
 
+    // console.log('startDate Date() 씌우기 전 : ', createScheduleDto.startDate)
+    // console.log('endDate Date() 씌우기 전 : ', createScheduleDto.endDate)
     const startDate = new Date(createScheduleDto.startDate)
     const endDate = new Date(createScheduleDto.endDate)
+    console.log('startDate Date() 씌운 후 : ', startDate)
+    console.log('endDate Date() 씌운 후 : ', endDate)
 
     // 종료일이 시작일보다 이전인 경우 에러
     if (endDate <= startDate) {
@@ -815,23 +819,18 @@ export class SchedulesService {
   }
 
   private adjustDateForAllDay(startDate: Date, endDate: Date): [Date, Date] {
-    const adjustedStartDate = new Date(startDate)
-    const adjustedEndDate = new Date(endDate)
-
     // KST로 변환 (+9시간)
-    const kstStartDate = new Date(
-      adjustedStartDate.getTime() + 9 * 60 * 60 * 1000,
-    )
-    const kstEndDate = new Date(adjustedEndDate.getTime() + 9 * 60 * 60 * 1000)
-
+    const kstStartDate = new Date(startDate.getTime() + 9 * 60 * 60 * 1000)
+    const kstEndDate = new Date(endDate.getTime() + 9 * 60 * 60 * 1000)
+    console.log(kstStartDate, kstEndDate)
     // KST 기준으로 시간 설정
-    kstStartDate.setHours(0, 0, 0, 0)
-    kstEndDate.setHours(23, 59, 59, 999)
-
+    kstStartDate.setUTCHours(0, 0, 0, 0)
+    kstEndDate.setUTCHours(23, 59, 59, 999)
+    console.log(kstStartDate, kstEndDate)
     // UTC로 다시 변환 (-9시간)
     const utcStartDate = new Date(kstStartDate.getTime() - 9 * 60 * 60 * 1000)
     const utcEndDate = new Date(kstEndDate.getTime() - 9 * 60 * 60 * 1000)
-
+    console.log(utcStartDate, utcEndDate)
     return [utcStartDate, utcEndDate]
   }
 
