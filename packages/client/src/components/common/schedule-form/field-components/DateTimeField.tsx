@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import DatePicker, { registerLocale } from 'react-datepicker'
 import { Controller, useFormContext } from 'react-hook-form'
-import BaseField from './BaseField'
+import BaseSection from './BaseSection'
 import { ko } from 'date-fns/locale'
 import 'react-datepicker/dist/react-datepicker.css'
 import './react-datepicker.css'
@@ -71,151 +71,148 @@ const DateTimeField = () => {
 
   return (
     <>
-      <BaseField
-        id="date"
-        label="날짜와 시간"
-        renderInput={() => (
-          <div className="pt-5">
+      <BaseSection label="날짜와 시간">
+        <div className="pt-5">
 
-            {/* 종일 옵션 토글 */}
-            <div className="mb-6 flex justify-between">
-              <h2 className="text-sm sm:text-base">하루 종일</h2>
+          {/* 종일 옵션 토글 */}
+          <div className="mb-6 flex justify-between">
+            <h2 className="text-sm sm:text-base">하루 종일</h2>
+            <Controller
+              name="isAllDay"
+              control={control}
+              render={({ field }) => (
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    {...field}
+                    checked={field.value}
+                    onChange={(e) => {
+                      field.onChange(e)
+                      if (e.target.checked) {
+                        if (startDate) setValue('startDate', setMidnight(startDate))
+                        if (endDate) setValue('endDate', setEndOfDay(endDate))
+                      }
+                    }}
+                  />
+                  <div className="
+                    w-11 h-6 bg-gray-300 
+                    peer-checked:bg-primary-base
+                    rounded-full peer 
+                    after:content-[''] 
+                    after:absolute 
+                    after:top-0.5 
+                    after:left-[2px] 
+                    after:bg-white 
+                    after:rounded-full 
+                    after:h-5 
+                    after:w-5 
+                    after:transition-all
+                    peer-checked:after:translate-x-full 
+                    peer-checked:after:border-white"
+                  >
+                  </div>
+                </label>
+              )}
+            />
+          </div>
+
+          {error && (
+            <div className="mb-4 mt-4 text-xs text-red-500 sm:text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="flex justify-between">
+              <div className="mb-1 block w-7 py-3 text-sm text-xs font-medium text-neutral-700 sm:w-20 sm:text-base">
+                <span>시작</span>
+                <span className="hidden sm:inline"> 일자</span>
+              </div>
               <Controller
-                name="isAllDay"
+                name="startDate"
                 control={control}
-                render={({ field }) => (
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      {...field}
-                      checked={field.value}
-                      onChange={(e) => {
-                        field.onChange(e)
-                        if (e.target.checked) {
-                          if (startDate) setValue('startDate', setMidnight(startDate))
-                          if (endDate) setValue('endDate', setEndOfDay(endDate))
+                rules={{ required: '시작 날짜를 입력해주세요.' }}
+                render={({ field, fieldState: { error } }) => (
+                  <div className="relative w-60 text-right">
+                    <DatePicker
+                      selected={field.value}
+                      onChange={(date) => {
+                        if (date) {
+                          if (!endDate) {
+                            setValue('startDate', date)
+                            setValue('endDate', addDays(date, 1))
+                          } else if (validateEndDate(endDate, date)) {
+                            setValue('startDate', date)
+                          }
                         }
                       }}
+                      showTimeSelect={!isAllDay}
+                      timeFormat="HH:mm"
+                      timeCaption="시간"
+                      locale="ko"
+                      timeIntervals={10}
+                      dateFormat={
+                        isAllDay ? 'yyyy. MM. dd.' : 'yyyy. MM. dd. aa h:mm'
+                      }
+                      customInput={<CustomInput />}
+                      calendarClassName="custom-datepicker"
                     />
-                    <div className="
-                      w-11 h-6 bg-gray-300 
-                      peer-checked:bg-primary-base
-                      rounded-full peer 
-                      after:content-[''] 
-                      after:absolute 
-                      after:top-0.5 
-                      after:left-[2px] 
-                      after:bg-white 
-                      after:rounded-full 
-                      after:h-5 
-                      after:w-5 
-                      after:transition-all
-                      peer-checked:after:translate-x-full 
-                      peer-checked:after:border-white"
-                    >
-                    </div>
-                  </label>
+                    {error && (
+                      <p className="mt-1 text-sm text-red-500 sm:text-right">
+                        {error.message}
+                      </p>
+                    )}
+                  </div>
                 )}
               />
             </div>
 
-            {error && (
-              <div className="mb-4 mt-4 text-xs text-red-500 sm:text-sm">
-                {error}
+            <div className="flex justify-between">
+              <div className="mb-1 block w-7 py-3 text-xs font-medium text-neutral-700 sm:w-20 sm:text-base">
+                <span>종료</span>
+                <span className="hidden sm:inline"> 일자</span>
               </div>
-            )}
-
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <div className="mb-1 block w-7 py-3 text-sm text-xs font-medium text-neutral-700 sm:w-20 sm:text-base">
-                  <span>시작</span>
-                  <span className="hidden sm:inline"> 일자</span>
-                </div>
-                <Controller
-                  name="startDate"
-                  control={control}
-                  rules={{ required: '시작 날짜를 입력해주세요.' }}
-                  render={({ field, fieldState: { error } }) => (
-                    <div className="relative w-60 text-right">
-                      <DatePicker
-                        selected={field.value}
-                        onChange={(date) => {
-                          if (date) {
-                            if (!endDate) {
-                              setValue('startDate', date)
-                              setValue('endDate', addDays(date, 1))
-                            } else if (validateEndDate(endDate, date)) {
-                              setValue('startDate', date)
-                            }
-                          }
-                        }}
-                        showTimeSelect={!isAllDay}
-                        timeFormat="HH:mm"
-                        timeCaption="시간"
-                        locale="ko"
-                        timeIntervals={10}
-                        dateFormat={
-                          isAllDay ? 'yyyy. MM. dd.' : 'yyyy. MM. dd. aa h:mm'
+              <Controller
+                name="endDate"
+                control={control}
+                rules={{ required: '종료 날짜를 입력해주세요.' }}
+                render={({ field, fieldState: { error } }) => (
+                  <div className="relative w-60 text-right">
+                    <DatePicker
+                      selected={field.value}
+                      onChange={(date) => {
+                        if (validateEndDate(date, startDate)) {
+                          field.onChange(date)
+                        } else {
+                          setValue('endDate', field.value)
                         }
-                        customInput={<CustomInput />}
-                        calendarClassName="custom-datepicker"
-                      />
-                      {error && (
-                        <p className="mt-1 text-sm text-red-500 sm:text-right">
-                          {error.message}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                />
-              </div>
-
-              <div className="flex justify-between">
-                <div className="mb-1 block w-7 py-3 text-xs font-medium text-neutral-700 sm:w-20 sm:text-base">
-                  <span>종료</span>
-                  <span className="hidden sm:inline"> 일자</span>
-                </div>
-                <Controller
-                  name="endDate"
-                  control={control}
-                  rules={{ required: '종료 날짜를 입력해주세요.' }}
-                  render={({ field, fieldState: { error } }) => (
-                    <div className="relative w-60 text-right">
-                      <DatePicker
-                        selected={field.value}
-                        onChange={(date) => {
-                          if (validateEndDate(date, startDate)) {
-                            field.onChange(date)
-                          } else {
-                            setValue('endDate', field.value)
-                          }
-                        }}
-                        showTimeSelect={!isAllDay}
-                        timeFormat="HH:mm"
-                        timeCaption="시간"
-                        locale="ko"
-                        timeIntervals={10}
-                        dateFormat={
-                          isAllDay ? 'yyyy. MM. dd.' : 'yyyy. MM. dd. aa h:mm'
-                        }
-                        customInput={<CustomInput />}
-                        minDate={startDate}
-                        calendarClassName="custom-datepicker"
-                      />
-                      {error && (
-                        <p className="mt-1 text-sm text-red-500 sm:text-right">
-                          {error.message}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                />
-              </div>
+                      }}
+                      showTimeSelect={!isAllDay}
+                      timeFormat="HH:mm"
+                      timeCaption="시간"
+                      locale="ko"
+                      timeIntervals={10}
+                      dateFormat={
+                        isAllDay ? 'yyyy. MM. dd.' : 'yyyy. MM. dd. aa h:mm'
+                      }
+                      customInput={<CustomInput />}
+                      minDate={startDate}
+                      calendarClassName="custom-datepicker"
+                    />
+                    {error && (
+                      <p className="mt-1 text-sm text-red-500 sm:text-right">
+                        {error.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+              />
             </div>
           </div>
-        )}
-      />
+        </div>
+      </BaseSection>
+
       <Toast />
     </>
   )

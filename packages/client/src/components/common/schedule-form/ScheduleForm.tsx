@@ -1,17 +1,20 @@
 import DownArrowIcon from '@/components/icons/DownArrowIcon'
 import { IPartialScheduleForm, PostSchedulesReq } from '@/types/schedules'
-import { useCallback, useEffect, useState } from 'react'
-import { FormProvider, SubmitHandler, useForm } from 'react-hook-form'
+import { useEffect, useState } from 'react'
+import { Controller, FormProvider, SubmitHandler, useForm } from 'react-hook-form'
 import CategoryField from './field-components/CategoryField'
 import DateTimeField from './field-components/DateTimeField'
 import TextAreaField from './field-components/TextAreaField'
 import TextInputField from './field-components/TextInputField'
 // import GroupField from './field-components/GroupField'
-import RepetitionField from './field-components/RepetitionField'
+// import RepetitionField from './field-components/RepetitionField'
+import { addDays, startOfToday } from 'date-fns'
 
 type Props = {
   defaultValue?: Partial<PostSchedulesReq>
+  /** form 제출시 실행될 함수 */
   onSubmit: (data: IPartialScheduleForm) => void
+  /** 하단 등록하기 버튼 메세지 */
   buttonMessage?: string
 }
 
@@ -20,40 +23,20 @@ const ScheduleForm = ({
   onSubmit,
   buttonMessage = '등록하기',
 }: Props) => {
-  const getDefaultValues = useCallback(() => {
-    if (!defaultValue) return { isAllDay: false, isRecurring: false }
+  const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false)
 
-    const {
-      title,
-      isAllDay,
-      startDate,
-      endDate,
-      categoryId,
-      memo,
-      isRecurring,
-    } = defaultValue
-    return {
-      title,
-      categoryId,
-      isAllDay,
-      startDate: new Date(startDate!),
-      endDate: new Date(endDate!),
-      memo,
-      isRecurring,
-    }
-  }, [defaultValue])
-
-  const methods = useForm<IPartialScheduleForm>({
-    defaultValues: getDefaultValues(),
+  const formScheduleCreate = useForm<IPartialScheduleForm>({
+    defaultValues: {
+      title: "",
+      categoryId: 7,
+      isAllDay: false,
+      startDate: startOfToday(),
+      endDate: addDays(startOfToday(), 2),
+      place: "",
+      memo: "",
+      isRecurring: false 
+    },
   })
-
-  const { reset } = methods
-
-  useEffect(() => {
-    reset(getDefaultValues())
-  }, [defaultValue, reset, getDefaultValues])
-
-  const [isOpen, setIsOpen] = useState<boolean>(false)
 
   const handleFormSubmit: SubmitHandler<IPartialScheduleForm> = async (
     data: IPartialScheduleForm,
@@ -66,13 +49,37 @@ const ScheduleForm = ({
     onSubmit(payload)
   }
 
+  /** defaultValue가 prop으로 넘어온 경우, 폼 defaultValue로 초기화 */
+  useEffect(() => {
+    if (defaultValue) {
+      formScheduleCreate.reset({
+        title: defaultValue.title,
+        categoryId: defaultValue.categoryId,
+        isAllDay: defaultValue.isAllDay,
+        startDate: new Date(defaultValue.startDate!),
+        endDate: new Date(defaultValue.endDate!),
+        place: defaultValue.place,
+        memo: defaultValue.memo,
+        isRecurring: defaultValue.isRecurring,
+      })
+    }
+  }, [defaultValue])
+
   return (
-    <FormProvider {...methods}>
-      <form onSubmit={methods.handleSubmit(handleFormSubmit)}>
-        <TextInputField
-          id="title"
-          label="일정 제목"
-          placeholder="일정 제목을 입력해주세요"
+    <FormProvider {...formScheduleCreate}>
+      <form onSubmit={formScheduleCreate.handleSubmit(handleFormSubmit)}>
+        <Controller
+          control={formScheduleCreate.control}
+          name="title"
+          render={({ field: { value, onChange }, fieldState: { error } }) => (
+            <TextInputField
+              label="일정 제목"
+              placeholder="일정 제목을 입력해주세요"
+              value={value}
+              onChange={onChange}
+              error={error}
+            />
+          )}
         />
         <DateTimeField />
         <CategoryField />
@@ -82,27 +89,35 @@ const ScheduleForm = ({
             className="flex w-full items-center justify-between pt-4 text-left"
             type="button"
             onClick={() => {
-              setIsOpen(!isOpen)
+              setIsDetailOpen(prev => !prev)
             }}
           >
             <span className="font-medium">+ 상세 설정 추가</span>
             <DownArrowIcon
               className={`h-5 w-5 transition-transform duration-200 ${
-                isOpen ? 'rotate-180 transform' : ''
+                isDetailOpen ? 'rotate-180 transform' : ''
               }`}
             />
           </button>
 
-          {isOpen && (
+          {isDetailOpen && (
             <div className="py-6">
-              <TextInputField
-                id="place"
-                label="장소"
-                placeholder="장소를 입력해주세요"
+              <Controller
+                control={formScheduleCreate.control}
+                name="place"
+                render={({ field: { value, onChange }, fieldState: { error } }) => (
+                  <TextInputField
+                    label="장소"
+                    placeholder="장소를 입력해주세요"
+                    value={value}
+                    onChange={onChange}
+                    error={error}
+                  />
+                )}
               />
 
               {/* <GroupField /> */}
-              <RepetitionField />
+              {/* <RepetitionField /> */}
 
               <TextAreaField
                 id="memo"
