@@ -8,7 +8,6 @@
     "build": "tsc -b && vite build",
     "lint": "eslint src",
     "preview": "vite preview",
-    "prepare": "husky",
     "format": "prettier --write \"src/**/*.ts\" \"src/**/*.tsx\" \"test/**/*.ts\" \"test/**/*.tsx\""
   },
   "dependencies": {
@@ -35,8 +34,6 @@
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "clsx": "^2.1.1",
-    "husky": "^9.1.6",
-    "lint-staged": "^15.2.10",
     "postcss": "^8.4.47",
     "prettier-plugin-tailwindcss": "^0.6.6",
     "tailwind-merge": "^2.5.2",
@@ -44,11 +41,5 @@
     "vite": "^5.4.1",
     "vite-plugin-pwa": "^0.20.5",
     "vite-tsconfig-paths": "^5.0.1"
-  },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ]
   }
 }
