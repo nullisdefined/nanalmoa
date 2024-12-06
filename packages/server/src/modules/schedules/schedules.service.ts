@@ -16,7 +16,7 @@ import {
   ResponseScheduleDto,
 } from './dto/response-schedule.dto'
 import { WeekQueryDto } from './dto/week-query-schedule.dto'
-import { CreateScheduleDto } from './dto/create-schedule.dto'
+import { CreateScheduleDto, RecurringInfo } from './dto/create-schedule.dto'
 import { UpdateScheduleDto } from './dto/update-schedule.dto'
 import { Category } from '@/entities/category.entity'
 
@@ -211,37 +211,29 @@ export class SchedulesService {
     const startDate = new Date(createScheduleDto.startDate)
     const endDate = new Date(createScheduleDto.endDate)
 
-    // 종료일이 시작일보다 이전인 경우 에러
     if (endDate <= startDate) {
       throw new BadRequestException('종료일은 시작일보다 이후여야 합니다.')
     }
 
-    // 반복 일정에 대한 유효성 검사
-    if (createScheduleDto.isRecurring) {
-      if (!createScheduleDto.repeatEndDate) {
-        throw new BadRequestException(
-          '반복 일정은 반드시 종료일(repeatEndDate)을 지정해야 합니다.',
-        )
-      }
+    if (createScheduleDto.recurringOptions) {
+      const repeatEndDate = new Date(
+        createScheduleDto.recurringOptions.repeatEndDate,
+      )
 
-      const repeatEndDate = new Date(createScheduleDto.repeatEndDate)
-
-      // repeatEndDate가 endDate보다 이전인 경우 에러
       if (repeatEndDate <= endDate) {
         throw new BadRequestException(
           '반복 일정의 종료일은 일정의 종료일보다 이후여야 합니다.',
         )
       }
 
-      // 반복 옵션 예외 검사
-      this.validateRecurringOptions(createScheduleDto)
+      this.validateRecurringOptions(createScheduleDto.recurringOptions)
     }
 
     const schedule = this.schedulesRepository.create({
       ...createScheduleDto,
       userUuid,
       category,
-      isRecurring: createScheduleDto.isRecurring,
+      isRecurring: !!createScheduleDto.recurringOptions,
     })
 
     if (schedule.isAllDay) {
@@ -251,21 +243,22 @@ export class SchedulesService {
       )
     }
 
-    // 먼저 schedule을 저장
     const savedSchedule = await this.schedulesRepository.save(schedule)
 
-    if (schedule.isRecurring) {
+    if (schedule.isRecurring && createScheduleDto.recurringOptions) {
       const recurring = this.recurringRepository.create({
-        repeatType: createScheduleDto.repeatType,
-        repeatEndDate: createScheduleDto.repeatEndDate,
-        recurringInterval: createScheduleDto.recurringInterval,
-        recurringDaysOfWeek: createScheduleDto.recurringDaysOfWeek,
-        recurringDayOfMonth: createScheduleDto.recurringDayOfMonth,
-        recurringMonthOfYear: createScheduleDto.recurringMonthOfYear,
-        scheduleId: savedSchedule.scheduleId, // 저장된 schedule의 ID를 참조
+        scheduleId: savedSchedule.scheduleId,
+        repeatType: createScheduleDto.recurringOptions.repeatType,
+        repeatEndDate: createScheduleDto.recurringOptions.repeatEndDate,
+        recurringInterval: createScheduleDto.recurringOptions.recurringInterval,
+        recurringDaysOfWeek:
+          createScheduleDto.recurringOptions.recurringDaysOfWeek,
+        recurringDayOfMonth:
+          createScheduleDto.recurringOptions.recurringDayOfMonth,
+        recurringMonthOfYear:
+          createScheduleDto.recurringOptions.recurringMonthOfYear,
       })
 
-      // recurring 레코드 저장
       const savedRecurring = await this.recurringRepository.save(recurring)
       savedSchedule.recurring = savedRecurring
     }
@@ -283,48 +276,48 @@ export class SchedulesService {
   /**
    * 반복 일정 옵션 유효성을 검사합니다.
    */
-  private validateRecurringOptions(createScheduleDto: CreateScheduleDto) {
+  private validateRecurringOptions(recurringOptions: RecurringInfo) {
     const {
       repeatType,
       recurringDaysOfWeek,
       recurringDayOfMonth,
       recurringMonthOfYear,
-    } = createScheduleDto
+    } = recurringOptions
 
     switch (repeatType) {
       case 'weekly':
-        if (recurringMonthOfYear !== null) {
+        if (recurringMonthOfYear !== undefined) {
           throw new BadRequestException(
-            '주간 반복에서는 recurringMonthOfYear를 설정할 수 없습니다.',
+            '주간 반복에서는 monthOfYear를 설정할 수 없습니다.',
           )
         }
         if (!recurringDaysOfWeek || recurringDaysOfWeek.length === 0) {
           throw new BadRequestException(
-            '주간 반복에서는 recurringDaysOfWeek를 반드시 설정해야 합니다.',
+            '주간 반복에서는 daysOfWeek를 반드시 설정해야 합니다.',
           )
         }
         break
       case 'monthly':
-        if (recurringMonthOfYear !== null) {
+        if (recurringMonthOfYear !== undefined) {
           throw new BadRequestException(
-            '월간 반복에서는 recurringMonthOfYear를 설정할 수 없습니다.',
+            '월간 반복에서는 monthOfYear를 설정할 수 없습니다.',
           )
         }
-        if (recurringDayOfMonth === null) {
+        if (recurringDayOfMonth === undefined) {
           throw new BadRequestException(
-            '월간 반복에서는 recurringDayOfMonth를 반드시 설정해야 합니다.',
+            '월간 반복에서는 dayOfMonth를 반드시 설정해야 합니다.',
           )
         }
         break
       case 'yearly':
-        if (recurringMonthOfYear === null) {
+        if (recurringMonthOfYear === undefined) {
           throw new BadRequestException(
-            '연간 반복에서는 recurringMonthOfYear를 반드시 설정해야 합니다.',
+            '연간 반복에서는 monthOfYear를 반드시 설정해야 합니다.',
           )
         }
-        if (recurringDayOfMonth === null) {
+        if (recurringDayOfMonth === undefined) {
           throw new BadRequestException(
-            '연간 반복에서는 recurringDayOfMonth를 반드시 설정해야 합니다.',
+            '연간 반복에서는 dayOfMonth를 반드시 설정해야 합니다.',
           )
         }
         break
@@ -447,78 +440,95 @@ export class SchedulesService {
     updateScheduleDto: UpdateScheduleDto,
     instanceDate: Date,
   ): Promise<ResponseScheduleDto> {
+    console.log('1. Original Schedule:', schedule)
+
+    // 1. 원본 반복 일정의 종료일을 수정 날짜 전날로 변경
     const originalEndDate = schedule.recurring.repeatEndDate
-
-    // 원본 일정의 반복 종료일 수정
-    schedule.recurring.repeatEndDate = new Date(instanceDate)
-    schedule.recurring.repeatEndDate.setUTCDate(
-      schedule.recurring.repeatEndDate.getUTCDate() - 1,
+    const modifiedEndDate = new Date(
+      instanceDate.getTime() - 24 * 60 * 60 * 1000,
     )
-    schedule.recurring.repeatEndDate.setUTCHours(23, 59, 59, 999)
-    await this.schedulesRepository.save(schedule)
+    await this.recurringRepository.update(schedule.recurring.recurringId, {
+      repeatEndDate: modifiedEndDate,
+    })
+    console.log('2. Modified original recurring end date to:', modifiedEndDate)
 
-    // 특정 일정 수정
-    const updatedInstance = new Schedule()
-    Object.assign(updatedInstance, schedule, updateScheduleDto)
-    updatedInstance.scheduleId = undefined
-    updatedInstance.startDate = new Date(instanceDate)
-    updatedInstance.startDate.setUTCHours(
+    // 2. 수정하려는 날짜의 단일 일정 생성
+    const singleInstance = this.schedulesRepository.create({
+      ...schedule,
+      ...updateScheduleDto,
+      scheduleId: undefined,
+      isRecurring: false,
+      recurring: null,
+      startDate: new Date(instanceDate),
+      endDate: new Date(instanceDate),
+    })
+
+    // 시간 설정
+    singleInstance.startDate.setUTCHours(
+      updateScheduleDto.startDate?.getUTCHours() ??
+        schedule.startDate.getUTCHours(),
+      updateScheduleDto.startDate?.getUTCMinutes() ??
+        schedule.startDate.getUTCMinutes(),
+    )
+    singleInstance.endDate.setUTCHours(
+      updateScheduleDto.endDate?.getUTCHours() ??
+        schedule.endDate.getUTCHours(),
+      updateScheduleDto.endDate?.getUTCMinutes() ??
+        schedule.endDate.getUTCMinutes(),
+    )
+
+    const savedSingleInstance =
+      await this.schedulesRepository.save(singleInstance)
+    console.log('3. Saved single instance:', savedSingleInstance)
+
+    // 3. 다음 날부터 시작하는 새로운 반복 일정 생성
+    const nextDay = new Date(instanceDate)
+    nextDay.setDate(nextDay.getDate() + 1)
+    nextDay.setUTCHours(
       schedule.startDate.getUTCHours(),
       schedule.startDate.getUTCMinutes(),
-    )
-    updatedInstance.endDate = new Date(instanceDate)
-    updatedInstance.endDate.setUTCHours(
-      schedule.endDate.getUTCHours(),
-      schedule.endDate.getUTCMinutes(),
+      0,
+      0,
     )
 
-    // 시간 변동사항이 있는 경우에만 시간 업데이트
-    if (updateScheduleDto.startDate) {
-      updatedInstance.startDate.setUTCHours(
-        updateScheduleDto.startDate.getUTCHours(),
-      )
-      updatedInstance.startDate.setUTCMinutes(
-        updateScheduleDto.startDate.getUTCMinutes(),
-      )
-    }
-    if (updateScheduleDto.endDate) {
-      updatedInstance.endDate.setUTCHours(
-        updateScheduleDto.endDate.getUTCHours(),
-      )
-      updatedInstance.endDate.setUTCMinutes(
-        updateScheduleDto.endDate.getUTCMinutes(),
-      )
-    }
-    updatedInstance.isRecurring = false
-    updatedInstance.recurring = null
+    const endTime = schedule.endDate.getTime() - schedule.startDate.getTime()
+    const nextDayEnd = new Date(nextDay.getTime() + endTime)
 
-    const savedInstance = await this.schedulesRepository.save(updatedInstance)
+    const newRecurringSchedule = this.schedulesRepository.create({
+      userUuid: schedule.userUuid,
+      category: schedule.category,
+      title: schedule.title,
+      place: schedule.place,
+      memo: schedule.memo,
+      isAllDay: schedule.isAllDay,
+      startDate: nextDay,
+      endDate: nextDayEnd,
+      isRecurring: true,
+    })
 
-    // 나머지 일정 생성
-    const newSchedule = new Schedule()
-    Object.assign(newSchedule, schedule)
-    newSchedule.scheduleId = undefined
-    newSchedule.recurring.repeatEndDate = originalEndDate
+    console.log('4. Created new recurring schedule:', newRecurringSchedule)
+    const savedNewSchedule =
+      await this.schedulesRepository.save(newRecurringSchedule)
+    console.log('5. Saved new recurring schedule:', savedNewSchedule)
 
-    // 반복 유형에 따라 다음 시작일 계산
-    const nextStartDate = this.getNextOccurrenceDate(schedule, instanceDate)
-    newSchedule.startDate = new Date(nextStartDate)
-    newSchedule.startDate.setUTCHours(
-      schedule.startDate.getUTCHours(),
-      schedule.startDate.getUTCMinutes(),
-    )
+    // 4. 새로운 반복 정보 생성
+    const newRecurring = this.recurringRepository.create({
+      scheduleId: savedNewSchedule.scheduleId,
+      repeatType: schedule.recurring.repeatType,
+      repeatEndDate: originalEndDate,
+      recurringInterval: schedule.recurring.recurringInterval,
+      recurringDaysOfWeek: schedule.recurring.recurringDaysOfWeek,
+      recurringDayOfMonth: schedule.recurring.recurringDayOfMonth,
+      recurringMonthOfYear: schedule.recurring.recurringMonthOfYear,
+    })
 
-    // 종료일 계산
-    const duration = schedule.endDate.getTime() - schedule.startDate.getTime()
-    newSchedule.endDate = new Date(newSchedule.startDate.getTime() + duration)
-    newSchedule.endDate.setHours(
-      schedule.endDate.getUTCHours(),
-      schedule.endDate.getUTCMinutes(),
-    )
+    const savedRecurring = await this.recurringRepository.save(newRecurring)
 
-    await this.schedulesRepository.save(newSchedule)
+    // 관계 설정
+    savedNewSchedule.recurring = savedRecurring
+    await this.schedulesRepository.save(savedNewSchedule)
 
-    return this.convertToResponseDto(savedInstance)
+    return this.convertToResponseDto(savedSingleInstance)
   }
 
   /**
@@ -529,30 +539,45 @@ export class SchedulesService {
     updateScheduleDto: UpdateScheduleDto,
     instanceDate: Date,
   ): Promise<ResponseScheduleDto> {
-    const originalEndDate = schedule.recurring.repeatEndDate
+    const originalSchedule = { ...schedule }
+    const originalRecurring = { ...schedule.recurring }
 
-    // 새로운 일정 생성
-    const newSchedule = new Schedule()
-    Object.assign(newSchedule, schedule, updateScheduleDto)
-    newSchedule.scheduleId = undefined
-
-    // startDate 업데이트
-    newSchedule.startDate = new Date(instanceDate)
-    if (updateScheduleDto.startDate) {
-      newSchedule.startDate.setUTCHours(
-        updateScheduleDto.startDate.getUTCHours(),
-        updateScheduleDto.startDate.getUTCMinutes(),
-        0,
-        0,
-      )
+    // 1. 기존 일정 처리
+    if (instanceDate.getTime() === schedule.startDate.getTime()) {
+      // 시작일부터 수정하는 경우, 기존 recurring 정보를 먼저 삭제
+      await this.recurringRepository.delete({ scheduleId: schedule.scheduleId })
+      await this.schedulesRepository.remove(schedule)
     } else {
-      newSchedule.startDate.setUTCHours(
-        schedule.startDate.getUTCHours(),
-        schedule.startDate.getUTCMinutes(),
-        0,
-        0,
-      )
+      // 중간 날짜부터 수정하는 경우, 기존 일정의 반복 종료일 수정
+      const updatedRepeatEndDate = new Date(instanceDate)
+      updatedRepeatEndDate.setUTCDate(updatedRepeatEndDate.getUTCDate() - 1)
+      updatedRepeatEndDate.setUTCHours(23, 59, 59, 999)
+      await this.recurringRepository.update(originalRecurring.recurringId, {
+        repeatEndDate: updatedRepeatEndDate,
+      })
     }
+
+    // 2. 새로운 일정 생성
+    const newSchedule = this.schedulesRepository.create({
+      userUuid: schedule.userUuid,
+      category: schedule.category,
+      title: updateScheduleDto.title ?? schedule.title,
+      place: updateScheduleDto.place ?? schedule.place,
+      memo: updateScheduleDto.memo ?? schedule.memo,
+      isAllDay: updateScheduleDto.isAllDay ?? schedule.isAllDay,
+      startDate: new Date(instanceDate),
+      isRecurring: true,
+    })
+
+    // 시간 설정
+    newSchedule.startDate.setUTCHours(
+      updateScheduleDto.startDate?.getUTCHours() ??
+        schedule.startDate.getUTCHours(),
+      updateScheduleDto.startDate?.getUTCMinutes() ??
+        schedule.startDate.getUTCMinutes(),
+      0,
+      0,
+    )
 
     if (updateScheduleDto.endDate) {
       newSchedule.endDate = new Date(updateScheduleDto.endDate)
@@ -561,26 +586,37 @@ export class SchedulesService {
       newSchedule.endDate = new Date(newSchedule.startDate.getTime() + duration)
     }
 
-    newSchedule.recurring.repeatEndDate = new Date(originalEndDate)
-
-    if (updateScheduleDto.categoryId) {
-      newSchedule.category = await this.getCategoryById(
-        updateScheduleDto.categoryId,
-      )
-    }
-
-    if (instanceDate.getTime() === schedule.startDate.getTime()) {
-      await this.schedulesRepository.remove(schedule)
-    } else {
-      schedule.recurring.repeatEndDate = new Date(instanceDate)
-      schedule.recurring.repeatEndDate.setUTCDate(
-        schedule.recurring.repeatEndDate.getUTCDate() - 1,
-      )
-      schedule.recurring.repeatEndDate.setUTCHours(23, 59, 59, 999)
-      await this.schedulesRepository.save(schedule)
-    }
-
+    // 3. 새로운 일정 저장
     const savedNewSchedule = await this.schedulesRepository.save(newSchedule)
+
+    // 4. 새로운 반복 정보 생성 및 저장
+    const newRecurring = this.recurringRepository.create({
+      scheduleId: savedNewSchedule.scheduleId,
+      repeatType:
+        updateScheduleDto.recurringOptions?.repeatType ??
+        originalRecurring.repeatType,
+      repeatEndDate:
+        updateScheduleDto.recurringOptions?.repeatEndDate ??
+        originalRecurring.repeatEndDate,
+      recurringInterval:
+        updateScheduleDto.recurringOptions?.recurringInterval ??
+        originalRecurring.recurringInterval,
+      recurringDaysOfWeek:
+        updateScheduleDto.recurringOptions?.recurringDaysOfWeek ??
+        originalRecurring.recurringDaysOfWeek,
+      recurringDayOfMonth:
+        updateScheduleDto.recurringOptions?.recurringDayOfMonth ??
+        originalRecurring.recurringDayOfMonth,
+      recurringMonthOfYear:
+        updateScheduleDto.recurringOptions?.recurringMonthOfYear ??
+        originalRecurring.recurringMonthOfYear,
+    })
+
+    const savedRecurring = await this.recurringRepository.save(newRecurring)
+
+    // 5. 관계 설정 및 최종 저장
+    savedNewSchedule.recurring = savedRecurring
+    await this.schedulesRepository.save(savedNewSchedule)
 
     return this.convertToResponseDto(savedNewSchedule)
   }
@@ -741,7 +777,6 @@ export class SchedulesService {
 
     for (const schedule of schedules) {
       const recurring = schedule.recurring
-      // recurring이 없는 경우 스킵
       if (!recurring) continue
 
       if (recurring.repeatEndDate && recurring.repeatEndDate < startDate) {
@@ -758,6 +793,10 @@ export class SchedulesService {
             newSchedule.startDate <= endDate &&
             newSchedule.endDate >= startDate
           ) {
+            if (schedule.recurring) {
+              newSchedule.recurring = schedule.recurring
+              newSchedule.isRecurring = true
+            }
             expandedSchedules.push(newSchedule)
           }
         }
@@ -775,7 +814,7 @@ export class SchedulesService {
       case 'daily':
         return true
       case 'weekly':
-        return schedule.recurring.recurringDaysOfWeek.includes(date.getDay())
+        return schedule.recurring.recurringDaysOfWeek?.includes(date.getDay())
       case 'monthly':
         return date.getDate() === schedule.recurring.recurringDayOfMonth
       case 'yearly':
@@ -800,7 +839,7 @@ export class SchedulesService {
       case 'weekly':
         do {
           nextDate.setDate(nextDate.getDate() + 1)
-        } while (!recurring.recurringDaysOfWeek.includes(nextDate.getDay()))
+        } while (!recurring.recurringDaysOfWeek?.includes(nextDate.getDay()))
         break
       case 'monthly':
         nextDate.setMonth(nextDate.getMonth() + interval)
@@ -820,11 +859,17 @@ export class SchedulesService {
     const duration = schedule.endDate.getTime() - schedule.startDate.getTime()
     const endDate = new Date(startDate.getTime() + duration)
 
-    return {
+    const occurrence = new Schedule()
+    Object.assign(occurrence, {
       ...schedule,
+      scheduleId: schedule.scheduleId,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
-    }
+      isRecurring: true,
+      recurring: schedule.recurring,
+    })
+
+    return occurrence
   }
 
   private adjustDateForAllDay(startDate: Date, endDate: Date): [Date, Date] {
@@ -899,7 +944,6 @@ export class SchedulesService {
       startDate: schedule.startDate,
       endDate: schedule.endDate,
       isAllDay: schedule.isAllDay,
-      isRecurring: schedule.isRecurring,
       recurring: schedule.recurring,
       groupInfo: groupInfo.length > 0 ? groupInfo : undefined,
     })
@@ -1006,7 +1050,6 @@ export class SchedulesService {
       dto.place = event.place || ''
       dto.isAllDay = event.isAllDay || false
       dto.categoryId = categoryMap[event.category] || 7 // 7은 '기타' 카테고리의 ID로 가정
-      dto.isRecurring = false
       return dto
     })
   }

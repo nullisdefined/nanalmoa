@@ -7,6 +7,15 @@ export class ResponseGroupInfo {
   users: UserInfo[]
 }
 
+export class RecurringInfoResponse {
+  repeatType: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+  repeatEndDate: Date
+  interval?: number
+  daysOfWeek?: number[]
+  dayOfMonth?: number
+  monthOfYear?: number
+}
+
 export class ResponseScheduleDto {
   scheduleId: number
   userUuid: string
@@ -17,13 +26,7 @@ export class ResponseScheduleDto {
   startDate: Date
   endDate: Date
   isAllDay: boolean
-  isRecurring: boolean
-  repeatType?: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
-  repeatEndDate?: Date
-  recurringInterval?: number
-  recurringDaysOfWeek?: number[]
-  recurringDayOfMonth?: number
-  recurringMonthOfYear?: number
+  recurringInfo?: RecurringInfoResponse
   groupInfo?: ResponseGroupInfo[]
 
   constructor(params: {
@@ -36,7 +39,6 @@ export class ResponseScheduleDto {
     startDate: Date
     endDate: Date
     isAllDay?: boolean
-    isRecurring: boolean
     recurring?: {
       repeatType: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
       repeatEndDate?: Date
@@ -56,15 +58,16 @@ export class ResponseScheduleDto {
     this.startDate = params.startDate
     this.endDate = params.endDate
     this.isAllDay = params.isAllDay || false
-    this.isRecurring = params.isRecurring
 
     if (params.recurring) {
-      this.repeatType = params.recurring.repeatType
-      this.repeatEndDate = params.recurring.repeatEndDate
-      this.recurringInterval = params.recurring.recurringInterval
-      this.recurringDaysOfWeek = params.recurring.recurringDaysOfWeek
-      this.recurringDayOfMonth = params.recurring.recurringDayOfMonth
-      this.recurringMonthOfYear = params.recurring.recurringMonthOfYear
+      this.recurringInfo = {
+        repeatType: params.recurring.repeatType,
+        repeatEndDate: params.recurring.repeatEndDate,
+        interval: params.recurring.recurringInterval,
+        daysOfWeek: params.recurring.recurringDaysOfWeek,
+        dayOfMonth: params.recurring.recurringDayOfMonth,
+        monthOfYear: params.recurring.recurringMonthOfYear,
+      }
     }
 
     this.groupInfo = params.groupInfo
