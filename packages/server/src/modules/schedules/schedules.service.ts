@@ -705,17 +705,22 @@ export class SchedulesService {
   private async deleteFutureInstances(
     schedule: Schedule,
     targetDate: Date,
-  ): Promise<Date> {
-    // 원본 일정의 종료일 수정
-    const originalEndDate = schedule.recurring.repeatEndDate
-    schedule.recurring.repeatEndDate = new Date(targetDate)
-    schedule.recurring.repeatEndDate.setUTCDate(
-      schedule.recurring.repeatEndDate.getUTCDate() - 1,
-    )
-    schedule.recurring.repeatEndDate.setUTCHours(23, 59, 59, 999)
-    await this.schedulesRepository.save(schedule)
+  ): Promise<void> {
+    if (targetDate.getTime() === schedule.startDate.getTime()) {
+      // 시작일부터 삭제하는 경우 전체 삭제
+      await this.recurringRepository.delete({ scheduleId: schedule.scheduleId })
+      await this.schedulesRepository.remove(schedule)
+    } else {
+      // 중간부터 삭제하는 경우 종료일 수정
+      const modifiedEndDate = new Date(
+        targetDate.getTime() - 24 * 60 * 60 * 1000,
+      )
+      modifiedEndDate.setUTCHours(23, 59, 59, 999)
 
-    return originalEndDate
+      await this.recurringRepository.update(schedule.recurring.recurringId, {
+        repeatEndDate: modifiedEndDate,
+      })
+    }
   }
 
   /**
@@ -725,22 +730,52 @@ export class SchedulesService {
     schedule: Schedule,
     targetDate: Date,
   ): Promise<void> {
-    // deleteFutureInstances를 이용해 원본 일정 수정
-    const originalEndDate = await this.deleteFutureInstances(
-      schedule,
-      targetDate,
-    )
+    // 1. 기존 일정의 반복 패턴 종료일을 하루 전으로 수정
+    const originalRecurring = { ...schedule.recurring }
+    const modifiedEndDate = new Date(targetDate.getTime() - 24 * 60 * 60 * 1000)
+    modifiedEndDate.setUTCHours(23, 59, 59, 999)
 
-    const newSchedule = { ...schedule }
-    newSchedule.scheduleId = undefined // 새로운 ID 생성을 위해 undefined 설정
-    newSchedule.startDate = this.getNextOccurrenceDate(schedule, targetDate)
-    newSchedule.endDate = new Date(
-      newSchedule.startDate.getTime() +
-        (schedule.endDate.getTime() - schedule.startDate.getTime()),
-    )
-    newSchedule.recurring.repeatEndDate = originalEndDate
+    // 기존 recurring 정보 수정
+    await this.recurringRepository.update(originalRecurring.recurringId, {
+      repeatEndDate: modifiedEndDate,
+    })
 
-    await this.schedulesRepository.save(newSchedule)
+    // 2. 다음날부터의 새로운 반복 일정 생성
+    const nextStartDate = this.getNextOccurrenceDate(schedule, targetDate)
+    if (nextStartDate <= originalRecurring.repeatEndDate) {
+      // 새로운 일정 생성
+      const newSchedule = new Schedule()
+      Object.assign(newSchedule, {
+        userUuid: schedule.userUuid,
+        category: schedule.category,
+        title: schedule.title,
+        place: schedule.place,
+        memo: schedule.memo,
+        isAllDay: schedule.isAllDay,
+        startDate: nextStartDate,
+        endDate: new Date(
+          nextStartDate.getTime() +
+            (schedule.endDate.getTime() - schedule.startDate.getTime()),
+        ),
+        isRecurring: true,
+      })
+
+      const savedNewSchedule = await this.schedulesRepository.save(newSchedule)
+
+      // 새로운 recurring 정보 생성
+      const newRecurring = new ScheduleRecurring()
+      Object.assign(newRecurring, {
+        scheduleId: savedNewSchedule.scheduleId,
+        repeatType: originalRecurring.repeatType,
+        repeatEndDate: originalRecurring.repeatEndDate,
+        recurringInterval: originalRecurring.recurringInterval,
+        recurringDaysOfWeek: originalRecurring.recurringDaysOfWeek,
+        recurringDayOfMonth: originalRecurring.recurringDayOfMonth,
+        recurringMonthOfYear: originalRecurring.recurringMonthOfYear,
+      })
+
+      await this.recurringRepository.save(newRecurring)
+    }
   }
 
   // 헬퍼 메서드
