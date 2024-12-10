@@ -1,5 +1,5 @@
 import DownArrowIcon from '@/components/icons/DownArrowIcon'
-import { IPartialScheduleForm, PostSchedulesReq } from '@/types/schedules'
+import { IPartialScheduleForm, ISchedule } from '@/types/schedules'
 import { useEffect, useState } from 'react'
 import { Controller, FormProvider, SubmitHandler, useForm } from 'react-hook-form'
 import CategoryField from './field-components/CategoryField'
@@ -11,7 +11,7 @@ import TextInputField from './field-components/TextInputField'
 import { addDays, startOfToday } from 'date-fns'
 
 type Props = {
-  defaultValue?: Partial<PostSchedulesReq>
+  defaultValue?: Partial<ISchedule>
   /** form 제출시 실행될 함수 */
   onSubmit: (data: IPartialScheduleForm) => void
   /** 하단 등록하기 버튼 메세지 */
@@ -54,7 +54,7 @@ const ScheduleForm = ({
     if (defaultValue) {
       formScheduleCreate.reset({
         title: defaultValue.title,
-        categoryId: defaultValue.categoryId,
+        categoryId: defaultValue.category?.categoryId,
         isAllDay: defaultValue.isAllDay,
         startDate: new Date(defaultValue.startDate!),
         endDate: new Date(defaultValue.endDate!),
@@ -82,7 +82,19 @@ const ScheduleForm = ({
           )}
         />
         <DateTimeField />
-        <CategoryField />
+
+        <Controller
+          control={formScheduleCreate.control}
+          name="categoryId"
+          render={({ field: { value, onChange }, fieldState: { error } }) => (
+            <CategoryField
+              value={value}
+              onChange={onChange}
+              error={error}
+            />
+          )}
+        />
+
         
         {/* 상세 설정 추가 Dropdown */}
         <div className="rounded border-b border-neutral-200 pb-3">

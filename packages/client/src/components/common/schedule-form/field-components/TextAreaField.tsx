@@ -27,12 +27,12 @@ const TextAreaField = ({
       error={error}
       required={required}
     >
-      <div className="w-full rounded border-2 border-neutral-300 p-3">
+      <div className="w-full rounded border border-neutral-300 p-3 bg-white">
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="h-20 w-full resize-none bg-transparent focus:outline-none"
+          className="h-20 w-full resize-none focus:outline-none"
         ></textarea>
       </div>
     </BaseSection>

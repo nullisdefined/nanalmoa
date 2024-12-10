@@ -36,6 +36,7 @@ export interface ISchedule extends IRepeatInfo {
   memo: string
   isAllDay: boolean
   category: ICategory
+  isRecurring: boolean;
 }
 
 export interface IMediaAnalysisResult extends IRepeatInfo {
