@@ -9,6 +9,7 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   error?: FieldError;
+  /** 해당 필드가 필수 작성 필드일때 true */
   required?: boolean
 }
 
@@ -31,9 +32,9 @@ const TextInputField = ({
       <div className="flex w-full">
         <Input
           type="text"
-          placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
           className={cn(
             'animate-border focus:shadow-outline appearance-none border-neutral-300 leading-tight',
             'text-neutral-700 transition-colors duration-300 ease-in-out focus:border-green-800 focus:outline-none',

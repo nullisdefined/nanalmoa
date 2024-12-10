@@ -66,7 +66,7 @@ export interface IPartialScheduleForm {
   endDate: Date
   title: string
   place: string
-  memo?: string
+  memo: string
   isAllDay: boolean
   categoryId: number
   isRecurring: boolean

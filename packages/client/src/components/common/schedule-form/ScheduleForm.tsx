@@ -49,7 +49,7 @@ const ScheduleForm = ({
     onSubmit(payload)
   }
 
-  /** defaultValue가 prop으로 넘어온 경우, 폼 defaultValue로 초기화 */
+  /** defaultValue가 프로퍼티로 넘어온 경우, 폼을 defaultValue로 초기화 */
   useEffect(() => {
     if (defaultValue) {
       formScheduleCreate.reset({
@@ -83,7 +83,8 @@ const ScheduleForm = ({
         />
         <DateTimeField />
         <CategoryField />
-
+        
+        {/* 상세 설정 추가 Dropdown */}
         <div className="rounded border-b border-neutral-200 pb-3">
           <button
             className="flex w-full items-center justify-between pt-4 text-left"
@@ -119,10 +120,18 @@ const ScheduleForm = ({
               {/* <GroupField /> */}
               {/* <RepetitionField /> */}
 
-              <TextAreaField
-                id="memo"
-                label="메모"
-                placeholder="자유롭게 작성해주세요"
+              <Controller
+                control={formScheduleCreate.control}
+                name="memo"
+                render={({ field: { value, onChange }, fieldState: { error } }) => (
+                  <TextAreaField
+                    label="메모"
+                    placeholder="자유롭게 작성해주세요"
+                    value={value}
+                    onChange={onChange}
+                    error={error}
+                  />
+                )}
               />
             </div>
           )}
