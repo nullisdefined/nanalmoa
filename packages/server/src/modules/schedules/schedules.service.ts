@@ -417,6 +417,13 @@ export class SchedulesService {
       }
     })
 
+    if (updateData.isAllDay) {
+      ;[schedule.startDate, schedule.endDate] = this.adjustDateForAllDay(
+        schedule.startDate,
+        schedule.endDate,
+      )
+    }
+
     // 카테고리 ID가 제공된 경우에만 카테고리 업데이트
     if (categoryId !== undefined) {
       const newCategory = await this.getCategoryById(categoryId)
@@ -808,12 +815,10 @@ export class SchedulesService {
   }
 
   private adjustDateForAllDay(startDate: Date, endDate: Date): [Date, Date] {
-    const adjustedStartDate = new Date(startDate)
-    adjustedStartDate.setUTCHours(0, 0, 0, 0)
-
-    const adjustedEndDate = new Date(endDate)
-    adjustedEndDate.setUTCHours(23, 59, 59, 999)
-    return [adjustedStartDate, adjustedEndDate]
+    return [
+      new Date(startDate.setHours(0, 0, 0, 0)),
+      new Date(endDate.setHours(23, 59, 59, 999)),
+    ]
   }
 
   private async getCategoryById(categoryId: number): Promise<Category> {

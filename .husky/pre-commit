@@ -1,0 +1,10 @@
+echo "🔎 eslint 적용 중"
+
+if yarn lint-staged; then
+  echo "⭕️ eslint 규칙 적용 성공"
+  exit 0
+else
+  echo "❌ eslint 규칙 적용 실패"
+  exit 1
+fi
+

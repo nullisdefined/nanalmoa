@@ -13,24 +13,35 @@
     "start:server": "yarn workspace server start:dev",
     "build:client": "yarn workspace client build",
     "build:server": "yarn workspace server build",
-    "format": "prettier --write .",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "check-format": "prettier --check .",
-    "lint:client": "yarn workspace client lint",
-    "lint:server": "yarn workspace server lint",
-    "lint:all": "yarn lint:client && yarn lint:server"
+    "lint:all": "yarn eslint --fix",
+    "lint:client": "yarn workspace client lint --fix",
+    "lint:server": "yarn workspace server lint --fix",
+    "prepare": "husky"
   },
   "dependencies": {
+    "axios": "^1.7.7"
+  },
+  "devDependencies": {
     "@eslint/js": "^9.15.0",
-    "@nestjs/typeorm": "^10.0.2",
-    "@typescript-eslint/eslint-plugin": "^5.59.0",
-    "@typescript-eslint/parser": "^5.59.0",
-    "eslint": "^9.5.0",
+    "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.12.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
     "prettier": "^3.3.3",
-    "prettier-plugin-tailwindcss": "^0.6.8",
-    "typeorm": "^0.3.20"
-  }
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.16.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "packageManager": "yarn@1.22.21"
 }
