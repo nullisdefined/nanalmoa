@@ -8,7 +8,9 @@ import TextAreaField from './field-components/TextAreaField'
 import TextInputField from './field-components/TextInputField'
 // import GroupField from './field-components/GroupField'
 // import RepetitionField from './field-components/RepetitionField'
-import { addDays, startOfToday } from 'date-fns'
+import { addDays, setHours, setMilliseconds, setMinutes, setSeconds, startOfToday } from 'date-fns'
+import ToggleField from './field-components/ToggleField'
+import BaseSection from './field-components/BaseSection'
 
 type Props = {
   defaultValue?: Partial<ISchedule>
@@ -49,6 +51,20 @@ const ScheduleForm = ({
     onSubmit(payload)
   }
 
+  /** 종일 옵션 선택 시, 시작 날짜의 시간을 자정으로 변환하는 함수 */
+  const setMidnight = (date: Date) => {
+    return setHours(setMinutes(setSeconds(setMilliseconds(date, 0), 0), 0), 0)
+  }
+
+  /** 종일 옵션 선택 시, 마지막 날짜의 시간을 23시 59분으로 변환하는 함수 */
+  const setEndOfDay = (date: Date) => {
+    return setHours(setMinutes(setSeconds(setMilliseconds(date, 999), 59), 59), 23)
+  }
+
+  const currentStartDate = formScheduleCreate.watch('startDate');
+  const currentEndDate = formScheduleCreate.watch('endDate');
+  const currentIsAllDay = formScheduleCreate.watch('isAllDay');
+
   /** defaultValue가 프로퍼티로 넘어온 경우, 폼을 defaultValue로 초기화 */
   useEffect(() => {
     if (defaultValue) {
@@ -81,7 +97,74 @@ const ScheduleForm = ({
             />
           )}
         />
-        <DateTimeField />
+
+        <BaseSection label="날짜와 시간">
+          <div className="flex flex-col gap-4">
+            <Controller
+              control={formScheduleCreate.control}
+              name="isAllDay"
+              render={({ field: { value, onChange }, fieldState: { error } }) => (
+                <ToggleField
+                  label="하루 종일"
+                  value={value}
+                  onChange={(isAllDay: boolean) => {
+                    onChange(isAllDay);
+                    
+                    if (isAllDay) {
+                      if (currentStartDate) {
+                        const midnight = setMidnight(currentStartDate);
+                        formScheduleCreate.setValue('startDate', midnight);
+                      }
+                      if (currentEndDate) {
+                        const endOfDay = setEndOfDay(currentEndDate);
+                        formScheduleCreate.setValue('endDate', endOfDay);
+                      }
+                    }
+                  }}
+                  error={error}
+                />
+              )}
+            />
+
+            <Controller
+              control={formScheduleCreate.control}
+              name="startDate"
+              rules={{ required: '시작 날짜를 입력해주세요.' }}
+              render={({ field: { value, onChange }, fieldState: { error } }) => (
+                <DateTimeField
+                  label="시작"
+                  value={value}
+                  onChange={(date: Date) => {
+                    if (date) {
+                      onChange(date)
+                      if (currentEndDate < date) {
+                        formScheduleCreate.setValue('endDate', addDays(date, 2))
+                      }
+                    }
+                  }}
+                  error={error}
+                  isAllDay={currentIsAllDay}
+                />
+              )}
+            />
+
+            <Controller
+              control={formScheduleCreate.control}
+              name="endDate"
+              rules={{ required: '종료 날짜를 입력해주세요.' }}
+              render={({ field: { value, onChange }, fieldState: { error } }) => (
+                <DateTimeField
+                  label="종료"
+                  value={value}
+                  onChange={onChange}
+                  error={error}
+                  minDate={currentStartDate}
+                  isAllDay={currentIsAllDay}
+                />
+              )}
+            />
+          </div>
+        </BaseSection>
 
         <Controller
           control={formScheduleCreate.control}
@@ -94,7 +177,6 @@ const ScheduleForm = ({
             />
           )}
         />
-
         
         {/* 상세 설정 추가 Dropdown */}
         <div className="rounded border-b border-neutral-200 pb-3">
