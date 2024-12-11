@@ -55,7 +55,7 @@ describe('Button', () => {
     expect(screen.getByLabelText('속성')).toBeInTheDocument()
   })
   
-  //스타일 렌더링
+  //스타일 렌더링 테마
   test('커스텀 클래스 적용 확인', () => {
     render(<Button text="버튼" className="custom-class" />)
     expect(screen.getByText('버튼')).toHaveClass('custom-class')
