@@ -6,7 +6,12 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import OpenAI from 'openai'
-import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm'
+import {
+  DataSource,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm'
 import { GroupService } from '../group/group.service'
 import { VoiceTranscriptionService } from './voice-transcription.service'
 import { UsersService } from '../users/users.service'
@@ -440,8 +445,6 @@ export class SchedulesService {
     updateScheduleDto: UpdateScheduleDto,
     instanceDate: Date,
   ): Promise<ResponseScheduleDto> {
-    console.log('1. Original Schedule:', schedule)
-
     // 1. 원본 반복 일정의 종료일을 수정 날짜 전날로 변경
     const originalEndDate = schedule.recurring.repeatEndDate
     const modifiedEndDate = new Date(
@@ -450,7 +453,6 @@ export class SchedulesService {
     await this.recurringRepository.update(schedule.recurring.recurringId, {
       repeatEndDate: modifiedEndDate,
     })
-    console.log('2. Modified original recurring end date to:', modifiedEndDate)
 
     // 2. 수정하려는 날짜의 단일 일정 생성
     const singleInstance = this.schedulesRepository.create({

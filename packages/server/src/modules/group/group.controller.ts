@@ -8,7 +8,6 @@ import {
   Body,
   Query,
   UseGuards,
-  Req,
   ForbiddenException,
   ParseIntPipe,
 } from '@nestjs/common'
@@ -23,11 +22,11 @@ import { GroupService } from './group.service'
 import { InviteGroupMemberDto } from './dto/invite-group-memeber.dto'
 import { RespondToInvitationDto } from './dto/response-invitation.dto'
 import { AuthGuard } from '@nestjs/passport'
-import { Request } from 'express'
 import { GroupInfoResponseDto } from './dto/response-group.dto'
 import { GroupMemberResponseDto } from './dto/response-group-member.dto'
 import { GroupDetailResponseDto } from './dto/response-group-detail.dto'
 import { GroupInvitationDetailDto } from './dto/response-group-invitation-detail.dto'
+import { GetUserUuid } from '@/common/decorators/get-user-uuid.decorator'
 
 @ApiTags('Group')
 @Controller('groups')
@@ -43,9 +42,8 @@ export class GroupController {
   @ApiResponse({ status: 400, description: '잘못된 요청' })
   async createGroup(
     @Query('groupName') groupName: string,
-    @Req() req: Request,
+    @GetUserUuid() creatorUuid: string,
   ) {
-    const creatorUuid = req.user['userUuid']
     return this.groupService.createGroup({ groupName, creatorUuid })
   }
 
@@ -57,9 +55,8 @@ export class GroupController {
   @ApiResponse({ status: 404, description: '그룹을 찾을 수 없음' })
   async deleteGroup(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Req() req: Request,
+    @GetUserUuid() adminUuid: string,
   ) {
-    const adminUuid = req.user['userUuid']
     await this.groupService.deleteGroup(groupId, adminUuid)
     return { message: '그룹이 성공적으로 삭제되었습니다.' }
   }
@@ -72,8 +69,9 @@ export class GroupController {
     description: '사용자의 그룹 목록',
     type: [GroupInfoResponseDto],
   })
-  async getUserGroups(@Req() req: Request): Promise<GroupInfoResponseDto[]> {
-    const userUuid = req.user['userUuid']
+  async getUserGroups(
+    @GetUserUuid() userUuid: string,
+  ): Promise<GroupInfoResponseDto[]> {
     return this.groupService.getUserGroups(userUuid)
   }
 
@@ -89,9 +87,8 @@ export class GroupController {
   @ApiResponse({ status: 404, description: '그룹을 찾을 수 없음' })
   async getGroupMembers(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Req() req: Request,
+    @GetUserUuid() userUuid: string,
   ): Promise<GroupMemberResponseDto[]> {
-    const userUuid = req.user['userUuid']
     return this.groupService.getGroupMembers(groupId, userUuid)
   }
 
@@ -103,9 +100,8 @@ export class GroupController {
   @ApiResponse({ status: 403, description: '권한 없음' })
   async inviteGroupMembers(
     @Body() inviteGroupMemberDto: InviteGroupMemberDto,
-    @Req() req: Request,
+    @GetUserUuid() inviterUuid: string,
   ) {
-    const inviterUuid = req.user['userUuid']
     if (inviteGroupMemberDto.inviteeUuids.includes(inviterUuid)) {
       throw new ForbiddenException('자신을 초대할 수 없습니다.')
     }
@@ -125,9 +121,8 @@ export class GroupController {
   async removeGroupMember(
     @Param('groupId', ParseIntPipe) groupId: number,
     @Param('memberUuid') memberUuid: string,
-    @Req() req: Request,
+    @GetUserUuid() adminUuid: string,
   ) {
-    const adminUuid = req.user['userUuid']
     await this.groupService.removeGroupMember(
       { groupId, memberUuid },
       adminUuid,
@@ -145,9 +140,8 @@ export class GroupController {
   @ApiResponse({ status: 404, description: '초대를 찾을 수 없음' })
   async acceptInvitation(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req: Request,
+    @GetUserUuid() inviteeUuid: string,
   ) {
-    const inviteeUuid = req.user['userUuid']
     return this.groupService.acceptInvitation(id, inviteeUuid)
   }
 
@@ -160,9 +154,8 @@ export class GroupController {
   @ApiResponse({ status: 404, description: '초대를 찾을 수 없음' })
   async rejectInvitation(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req: Request,
+    @GetUserUuid() inviteeUuid: string,
   ) {
-    const inviteeUuid = req.user['userUuid']
     return this.groupService.rejectInvitation(id, inviteeUuid)
   }
 
@@ -175,9 +168,8 @@ export class GroupController {
   @ApiResponse({ status: 404, description: '초대를 찾을 수 없음' })
   async cancelInvitation(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req: Request,
+    @GetUserUuid() inviterUuid: string,
   ) {
-    const inviterUuid = req.user['userUuid']
     return this.groupService.cancelInvitation(id, inviterUuid)
   }
 
@@ -189,9 +181,8 @@ export class GroupController {
     type: [RespondToInvitationDto],
   })
   async getSentInvitations(
-    @Req() req: Request,
+    @GetUserUuid() userUuid: string,
   ): Promise<RespondToInvitationDto[]> {
-    const userUuid = req.user['userUuid']
     return this.groupService.getSentInvitations(userUuid)
   }
 
@@ -203,9 +194,8 @@ export class GroupController {
     type: [RespondToInvitationDto],
   })
   async getReceivedInvitations(
-    @Req() req: Request,
+    @GetUserUuid() userUuid: string,
   ): Promise<RespondToInvitationDto[]> {
-    const userUuid = req.user['userUuid']
     return this.groupService.getReceivedInvitations(userUuid)
   }
 
@@ -236,9 +226,8 @@ export class GroupController {
   @ApiResponse({ status: 404, description: '그룹을 찾을 수 없음' })
   async getGroupDetail(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Req() req: Request,
+    @GetUserUuid() userUuid: string,
   ): Promise<GroupDetailResponseDto> {
-    const userUuid = req.user['userUuid']
     return this.groupService.getGroupDetail(groupId, userUuid)
   }
 }

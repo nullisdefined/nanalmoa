@@ -7,7 +7,6 @@ import {
   Delete,
   UseGuards,
   Patch,
-  Req,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -19,8 +18,8 @@ import { ManagerService } from './manager.service'
 import { ManagerInvitation } from 'src/entities/manager-invitation.entity'
 import { UserResponseDto } from '../users/dto/user-response.dto'
 import { AuthGuard } from '@nestjs/passport'
-import { Request } from 'express'
 import { InvitationResponseDto } from './dto/response-invitation.dto'
+import { GetUserUuid } from '@/common/decorators/get-user-uuid.decorator'
 
 @ApiTags('Manager')
 @Controller('manager')
@@ -38,9 +37,8 @@ export class ManagerController {
   })
   async createInvitation(
     @Query('subordinateUuid') subordinateUuid: string,
-    @Req() req: Request,
+    @GetUserUuid() managerUuid: string,
   ): Promise<InvitationResponseDto> {
-    const managerUuid = req.user['userUuid']
     return this.managerService.createInvitation({
       managerUuid,
       subordinateUuid,
@@ -55,9 +53,8 @@ export class ManagerController {
     type: [InvitationResponseDto],
   })
   async getInvitationSend(
-    @Req() req: Request,
+    @GetUserUuid() managerUuid: string,
   ): Promise<InvitationResponseDto[]> {
-    const managerUuid = req.user['userUuid']
     return this.managerService.getInvitationSend({ managerUuid })
   }
 
@@ -69,9 +66,8 @@ export class ManagerController {
     type: [InvitationResponseDto],
   })
   async getInvitationReceived(
-    @Req() req: Request,
+    @GetUserUuid() subordinateUuid: string,
   ): Promise<InvitationResponseDto[]> {
-    const subordinateUuid = req.user['userUuid']
     return this.managerService.getInvitationReceived({ subordinateUuid })
   }
 
@@ -112,9 +108,8 @@ export class ManagerController {
   })
   async acceptInvitation(
     @Param('id') id: number,
-    @Req() req: Request,
+    @GetUserUuid() subordinateUuid: string,
   ): Promise<InvitationResponseDto> {
-    const subordinateUuid = req.user['userUuid']
     return this.managerService.acceptInvitation(id, subordinateUuid)
   }
 
@@ -127,9 +122,8 @@ export class ManagerController {
   })
   async rejectInvitation(
     @Param('id') id: number,
-    @Req() req: Request,
+    @GetUserUuid() subordinateUuid: string,
   ): Promise<InvitationResponseDto> {
-    const subordinateUuid = req.user['userUuid']
     return this.managerService.rejectInvitation(id, subordinateUuid)
   }
 
@@ -142,9 +136,8 @@ export class ManagerController {
   })
   async cancelInvitation(
     @Param('id') id: number,
-    @Req() req: Request,
+    @GetUserUuid() managerUuid: string,
   ): Promise<InvitationResponseDto> {
-    const managerUuid = req.user['userUuid']
     return this.managerService.cancelInvitation(id, managerUuid)
   }
 
@@ -156,9 +149,8 @@ export class ManagerController {
   })
   async removeSubordinate(
     @Param('subordinateUuid') subordinateUuid: string,
-    @Req() req: Request,
+    @GetUserUuid() managerUuid: string,
   ): Promise<void> {
-    const managerUuid = req.user['userUuid']
     return this.managerService.removeManagerSubordinate(
       managerUuid,
       subordinateUuid,
@@ -173,9 +165,8 @@ export class ManagerController {
   })
   async removeManager(
     @Param('managerUuid') managerUuid: string,
-    @Req() req: Request,
+    @GetUserUuid() subordinateUuid: string,
   ): Promise<void> {
-    const subordinateUuid = req.user['userUuid']
     return this.managerService.removeManagerSubordinate(
       managerUuid,
       subordinateUuid,
@@ -189,8 +180,9 @@ export class ManagerController {
     description: '관리자 목록 조회 성공',
     type: [UserResponseDto],
   })
-  async getManagerList(@Req() req: Request): Promise<UserResponseDto[]> {
-    const subordinateUuid = req.user['userUuid']
+  async getManagerList(
+    @GetUserUuid() subordinateUuid: string,
+  ): Promise<UserResponseDto[]> {
     return this.managerService.getManagerList(subordinateUuid)
   }
 
@@ -201,8 +193,9 @@ export class ManagerController {
     description: '피관리자 목록 조회 성공',
     type: [UserResponseDto],
   })
-  async getSubordinateList(@Req() req: Request): Promise<UserResponseDto[]> {
-    const managerUuid = req.user['userUuid']
+  async getSubordinateList(
+    @GetUserUuid() managerUuid: string,
+  ): Promise<UserResponseDto[]> {
     return this.managerService.getSubordinateList(managerUuid)
   }
 }
