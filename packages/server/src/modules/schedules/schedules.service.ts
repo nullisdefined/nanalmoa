@@ -706,6 +706,7 @@ export class SchedulesService {
     schedule: Schedule,
     targetDate: Date,
   ): Promise<void> {
+    // console.log('deleteFutureInstances', targetDate)
     if (targetDate.getTime() === schedule.startDate.getTime()) {
       // 시작일부터 삭제하는 경우 전체 삭제
       await this.recurringRepository.delete({ scheduleId: schedule.scheduleId })
