@@ -908,12 +908,10 @@ export class SchedulesService {
   }
 
   private adjustDateForAllDay(startDate: Date, endDate: Date): [Date, Date] {
-    const adjustedStartDate = new Date(startDate)
-    adjustedStartDate.setUTCHours(0, 0, 0, 0)
-
-    const adjustedEndDate = new Date(endDate)
-    adjustedEndDate.setUTCHours(23, 59, 59, 999)
-    return [adjustedStartDate, adjustedEndDate]
+    return [
+      new Date(startDate.setHours(0, 0, 0, 0)),
+      new Date(endDate.setHours(23, 59, 59, 999)),
+    ]
   }
 
   private async getCategoryById(categoryId: number): Promise<Category> {
