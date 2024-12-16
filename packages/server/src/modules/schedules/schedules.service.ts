@@ -4,7 +4,7 @@ import { BadRequestException, Logger, NotFoundException } from '@nestjs/common'
 
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { InjectRepository } from '@nestjs/typeorm'
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
 import OpenAI from 'openai'
 import {
   DataSource,
@@ -24,6 +24,7 @@ import { WeekQueryDto } from './dto/week-query-schedule.dto'
 import { CreateScheduleDto, RecurringInfo } from './dto/create-schedule.dto'
 import { UpdateScheduleDto } from './dto/update-schedule.dto'
 import { Category } from '@/entities/category.entity'
+import { Transactional } from 'typeorm-transactional'
 
 @Injectable()
 export class SchedulesService {
@@ -43,6 +44,8 @@ export class SchedulesService {
     @InjectRepository(GroupSchedule)
     private groupScheduleRepository: Repository<GroupSchedule>,
     private groupService: GroupService,
+    @InjectDataSource()
+    private dataSource: DataSource,
   ) {
     const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY')
     this.openai = new OpenAI({ apiKey: openaiApiKey })
@@ -205,13 +208,18 @@ export class SchedulesService {
   /**
    * 새로운 일정을 생성합니다.
    */
+  @Transactional()
   async createSchedule(
     userUuid: string,
     createScheduleDto: CreateScheduleDto,
   ): Promise<ResponseScheduleDto> {
-    const category = await this.getCategoryById(
-      createScheduleDto.categoryId ?? 7,
-    )
+    const category = await this.categoryRepository.findOne({
+      where: { categoryId: createScheduleDto.categoryId ?? 7 },
+    })
+
+    if (!category) {
+      throw new NotFoundException('해당 카테고리가 존재하지 않습니다.')
+    }
 
     const startDate = new Date(createScheduleDto.startDate)
     const endDate = new Date(createScheduleDto.endDate)
@@ -332,6 +340,7 @@ export class SchedulesService {
   /**
    * 기존 일정을 수정합니다.
    */
+  @Transactional()
   async updateSchedule(
     userUuid: string,
     scheduleId: number,
@@ -343,6 +352,7 @@ export class SchedulesService {
       where: { scheduleId, userUuid },
       relations: ['category', 'recurring'],
     })
+
     // 사용자가 생성한 일정이 아니라면 공유 받은 일정인지 찾음
     if (!schedule) {
       schedule = await this.findSharedGroupSchedulesByScheduleId(
@@ -350,6 +360,7 @@ export class SchedulesService {
         scheduleId,
       )
     }
+
     if (!schedule) {
       throw new NotFoundException(
         `해당 ID : ${scheduleId}를 가진 일정을 찾을 수 없습니다.`,
@@ -368,22 +379,20 @@ export class SchedulesService {
     }
 
     let updatedSchedule
-
     if (schedule.isRecurring) {
       // 반복 일정 수정
-      if (updateType === 'single') {
-        updatedSchedule = await this.updateSingleInstance(
-          schedule,
-          updateScheduleDto,
-          instanceDate,
-        )
-      } else {
-        updatedSchedule = await this.updateFutureInstances(
-          schedule,
-          updateScheduleDto,
-          instanceDate,
-        )
-      }
+      updatedSchedule =
+        updateType === 'single'
+          ? await this.updateSingleInstance(
+              schedule,
+              updateScheduleDto,
+              instanceDate,
+            )
+          : await this.updateFutureInstances(
+              schedule,
+              updateScheduleDto,
+              instanceDate,
+            )
     } else {
       // 일반 일정 수정
       updatedSchedule = await this.updateNonRecurringSchedule(
@@ -391,6 +400,7 @@ export class SchedulesService {
         updateScheduleDto,
       )
     }
+
     // 그룹 정보 업데이트 (일정 생성자만 가능)
     if (isCreator) {
       if (updateScheduleDto.addGroupInfo) {
@@ -407,7 +417,7 @@ export class SchedulesService {
       }
     }
 
-    return this.convertToResponseDto(updatedSchedule)
+    return updatedSchedule
   }
 
   private async updateNonRecurringSchedule(
@@ -432,7 +442,9 @@ export class SchedulesService {
 
     // 카테고리 ID가 제공된 경우에만 카테고리 업데이트
     if (categoryId !== undefined) {
-      const newCategory = await this.getCategoryById(categoryId)
+      const newCategory = await this.categoryRepository.findOne({
+        where: { categoryId },
+      })
       if (newCategory) {
         schedule.category = newCategory
       }
@@ -488,7 +500,6 @@ export class SchedulesService {
 
     const savedSingleInstance =
       await this.schedulesRepository.save(singleInstance)
-    console.log('3. Saved single instance:', savedSingleInstance)
 
     // 3. 다음 날부터 시작하는 새로운 반복 일정 생성
     const nextDay = new Date(instanceDate)
@@ -515,10 +526,8 @@ export class SchedulesService {
       isRecurring: true,
     })
 
-    console.log('4. Created new recurring schedule:', newRecurringSchedule)
     const savedNewSchedule =
       await this.schedulesRepository.save(newRecurringSchedule)
-    console.log('5. Saved new recurring schedule:', savedNewSchedule)
 
     // 4. 새로운 반복 정보 생성
     const newRecurring = this.recurringRepository.create({
@@ -554,7 +563,9 @@ export class SchedulesService {
     // 1. 기존 일정 처리
     if (instanceDate.getTime() === schedule.startDate.getTime()) {
       // 시작일부터 수정하는 경우, 기존 recurring 정보를 먼저 삭제
-      await this.recurringRepository.delete({ scheduleId: schedule.scheduleId })
+      await this.recurringRepository.delete({
+        scheduleId: schedule.scheduleId,
+      })
       await this.schedulesRepository.remove(schedule)
     } else {
       // 중간 날짜부터 수정하는 경우, 기존 일정의 반복 종료일 수정
@@ -633,26 +644,26 @@ export class SchedulesService {
   /**
    * 일정을 삭제합니다.
    */
+  @Transactional()
   async deleteSchedule(
     userUuid: string,
     scheduleId: number,
     instanceDate: string,
     deleteType: 'single' | 'future' = 'single',
   ): Promise<void> {
-    // 일단 해당 ID로 사용자가 생성한 일정인지 찾음
+    // 일정 조회
     let schedule = await this.schedulesRepository.findOne({
       where: { scheduleId, userUuid },
       relations: ['recurring'],
     })
     let isCreator = true
 
-    // 사용자가 생성한 일정이 아니라면 공유 받은 일정인지 찾음
+    // 공유 받은 일정인지 확인
     if (!schedule) {
-      const sharedSchedules = await this.findSharedGroupSchedulesByScheduleId(
+      schedule = await this.findSharedGroupSchedulesByScheduleId(
         userUuid,
         scheduleId,
       )
-      schedule = sharedSchedules
       isCreator = false
     }
 
@@ -661,6 +672,7 @@ export class SchedulesService {
         `ID가 ${scheduleId}인 일정을 찾을 수 없습니다.`,
       )
     }
+
     const targetDate = new Date(instanceDate)
 
     if (schedule.isRecurring) {
@@ -686,7 +698,9 @@ export class SchedulesService {
     } else {
       if (isCreator) {
         // 일정 생성자인 경우 일정과 관련된 모든 그룹 일정 삭제
-        await this.groupScheduleRepository.delete({ schedule: { scheduleId } })
+        await this.groupScheduleRepository.delete({
+          schedule: { scheduleId },
+        })
         await this.schedulesRepository.remove(schedule)
       } else {
         // 공유 받은 사용자인 경우 해당 사용자의 그룹 일정만 삭제
@@ -717,7 +731,9 @@ export class SchedulesService {
   ): Promise<void> {
     if (targetDate.getTime() === schedule.startDate.getTime()) {
       // 시작일부터 삭제하는 경우 전체 삭제
-      await this.recurringRepository.delete({ scheduleId: schedule.scheduleId })
+      await this.recurringRepository.delete({
+        scheduleId: schedule.scheduleId,
+      })
       await this.schedulesRepository.remove(schedule)
     } else {
       // 중간부터 삭제하는 경우 종료일 수정
@@ -753,8 +769,7 @@ export class SchedulesService {
     const nextStartDate = this.getNextOccurrenceDate(schedule, targetDate)
     if (nextStartDate <= originalRecurring.repeatEndDate) {
       // 새로운 일정 생성
-      const newSchedule = new Schedule()
-      Object.assign(newSchedule, {
+      const newSchedule = this.schedulesRepository.create({
         userUuid: schedule.userUuid,
         category: schedule.category,
         title: schedule.title,
@@ -772,8 +787,7 @@ export class SchedulesService {
       const savedNewSchedule = await this.schedulesRepository.save(newSchedule)
 
       // 새로운 recurring 정보 생성
-      const newRecurring = new ScheduleRecurring()
-      Object.assign(newRecurring, {
+      const newRecurring = this.recurringRepository.create({
         scheduleId: savedNewSchedule.scheduleId,
         repeatType: originalRecurring.repeatType,
         repeatEndDate: originalRecurring.repeatEndDate,
