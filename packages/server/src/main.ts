@@ -6,11 +6,17 @@ import fs from 'fs'
 import session from 'express-session'
 import passport from 'passport'
 import 'reflect-metadata'
+import { initializeTransactionalContext } from 'typeorm-transactional'
 
 declare const module: any
 
 async function bootstrap() {
+  initializeTransactionalContext() // Initialize TypeORM transaction
+
   const app = await NestFactory.create(AppModule)
+
+  app.setGlobalPrefix('api')
+
   app.enableCors({
     origin:
       process.env.NODE_ENV === 'production'
@@ -18,7 +24,6 @@ async function bootstrap() {
         : 'http://localhost:5173',
     credentials: true,
   })
-  app.setGlobalPrefix('api')
 
   const port = process.env.PORT
 

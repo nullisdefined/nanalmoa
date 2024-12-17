@@ -9,7 +9,6 @@ import {
   Patch,
   UseInterceptors,
   UploadedFile,
-  Req,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common'
@@ -34,6 +33,7 @@ import { AuthGuard } from '@nestjs/passport'
 import { UpdateScheduleDto } from './dto/update-schedule.dto'
 import { ManagerService } from '../manager/manager.service'
 import { Multer } from 'multer'
+import { GetUserUuid } from '@/common/decorators/get-user-uuid.decorator'
 
 @ApiTags('Schedules')
 @UseGuards(AuthGuard('jwt'))
@@ -52,7 +52,7 @@ export class SchedulesController {
     name: 'userUuid',
     required: false,
     type: String,
-    description: '사용자의 UUID',
+    description: '사용자의 UUID. 미입력시 본인 일정 조회',
   })
   @ApiQuery({
     name: 'date',
@@ -79,11 +79,10 @@ export class SchedulesController {
     },
   })
   async getSchedulesByDate(
-    @Req() req,
+    @GetUserUuid() managerUuid: string,
     @Query('date') date: string,
     @Query('userUuid') queryUserUuid?: string,
   ): Promise<ResponseScheduleDto[]> {
-    const managerUuid = req.user.userUuid
     const subordinateUuid = queryUserUuid || managerUuid
 
     if (subordinateUuid !== managerUuid) {
@@ -137,11 +136,10 @@ export class SchedulesController {
     },
   })
   async getSchedulesByWeek(
-    @Req() req,
+    @GetUserUuid() managerUuid: string,
     @Query('userUuid') queryUserUuid: string,
     @Query('date') date: string,
   ): Promise<ResponseScheduleDto[]> {
-    const managerUuid = req.user.userUuid
     const subordinateUuid = queryUserUuid || managerUuid
 
     if (subordinateUuid !== managerUuid) {
@@ -199,12 +197,11 @@ export class SchedulesController {
     },
   })
   async getSchedulesByMonth(
-    @Req() req,
+    @GetUserUuid() managerUuid: string,
     @Query('userUuid') queryUserUuid: string,
     @Query('year') year: number,
     @Query('month') month: number,
   ): Promise<ResponseScheduleDto[]> {
-    const managerUuid = req.user.userUuid
     const subordinateUuid = queryUserUuid || managerUuid
 
     if (subordinateUuid !== managerUuid) {
@@ -255,12 +252,12 @@ export class SchedulesController {
     },
   })
   async getSchedulesByYear(
-    @Req() req,
+    @GetUserUuid() userUuid: string,
     @Query('userUuid') queryUserUuid: string,
     @Query('year') year: number,
   ): Promise<ResponseScheduleDto[]> {
-    const userUuid = queryUserUuid || req.user.userUuid
-    return this.schedulesService.findByYear(userUuid, year)
+    const targetUuid = queryUserUuid || userUuid
+    return this.schedulesService.findByYear(targetUuid, year)
   }
 
   @Get('range')
@@ -289,12 +286,11 @@ export class SchedulesController {
     type: [ResponseScheduleDto],
   })
   async getSchedulesByDateRange(
-    @Req() req,
+    @GetUserUuid() managerUuid: string,
     @Query('userUuid') queryUserUuid: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ): Promise<ResponseScheduleDto[]> {
-    const managerUuid = req.user.userUuid
     const subordinateUuid = queryUserUuid || managerUuid
 
     if (subordinateUuid !== managerUuid) {
@@ -327,8 +323,9 @@ export class SchedulesController {
     description: '일정 조회 성공',
     type: [ResponseScheduleDto],
   })
-  async getAllSchedulesByUserUuid(@Req() req): Promise<ResponseScheduleDto[]> {
-    const userUuid = req.user.userUuid
+  async getAllSchedulesByUserUuid(
+    @GetUserUuid() userUuid: string,
+  ): Promise<ResponseScheduleDto[]> {
     return this.schedulesService.findAllByUserUuid(userUuid)
   }
 
@@ -371,10 +368,9 @@ export class SchedulesController {
     type: ResponseScheduleDto,
   })
   async createSchedule(
-    @Req() req,
+    @GetUserUuid() userUuid: string,
     @Body() createScheduleDto: CreateScheduleDto,
   ): Promise<ResponseScheduleDto> {
-    const userUuid = req.user.userUuid
     return await this.schedulesService.createSchedule(
       userUuid,
       createScheduleDto,
@@ -413,13 +409,12 @@ export class SchedulesController {
     type: ResponseScheduleDto,
   })
   async updateSchedule(
-    @Req() req,
+    @GetUserUuid() userUuid: string,
     @Param('id') id: number,
     @Body() updateScheduleDto: UpdateScheduleDto,
     @Query('instanceDate') instanceDate: string,
     @Query('updateType') updateType: 'single' | 'future' = 'single',
   ): Promise<ResponseScheduleDto> {
-    const userUuid = req.user.userUuid
     return await this.schedulesService.updateSchedule(
       userUuid,
       id,
@@ -496,15 +491,15 @@ export class SchedulesController {
     },
   })
   async deleteSchedule(
-    @Req() req,
+    @GetUserUuid() userUuid: string,
     @Param('id') id: number,
     @Query('userUuid') queryUserUuid: string,
     @Query('instanceDate') instanceDate: string,
     @Query('deleteType') deleteType: 'single' | 'future' = 'single',
   ): Promise<{ message: string }> {
-    const userUuid = queryUserUuid || req.user.userUuid
+    const targetUuid = queryUserUuid || userUuid
     await this.schedulesService.deleteSchedule(
-      userUuid,
+      targetUuid,
       id,
       instanceDate,
       deleteType,
@@ -522,11 +517,10 @@ export class SchedulesController {
     description: '추출된 일정 정보',
   })
   async uploadVoiceScheduleByRTZR(
-    @Req() req,
+    @GetUserUuid() userUuid: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('currentDateTime') currentDateTime: string,
   ): Promise<CreateScheduleDto[]> {
-    const userUuid = req.user.userUuid
     return await this.schedulesService.transcribeRTZRAndFetchResultWithGpt(
       file,
       currentDateTime,
@@ -544,11 +538,10 @@ export class SchedulesController {
     description: '추출된 일정 정보',
   })
   async uploadVoiceScheduleByWhisper(
-    @Req() req,
+    @GetUserUuid() userUuid: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('currentDateTime') currentDateTime: string,
   ): Promise<CreateScheduleDto[]> {
-    const userUuid = req.user.userUuid
     return await this.schedulesService.transcribeWhisperAndFetchResultWithGpt(
       file,
       currentDateTime,
@@ -568,9 +561,8 @@ export class SchedulesController {
   })
   async uploadImageScheduleClova(
     @UploadedFile() file: Express.Multer.File,
-    @Req() req,
+    @GetUserUuid() userUuid: string,
   ): Promise<CreateScheduleDto[]> {
-    const userUuid = req.user.userUuid
     return await this.ocrTranscriptionService.processMedicationImage(
       file,
       userUuid,
