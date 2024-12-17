@@ -1,3 +1,5 @@
 *.woff2 filter=lfs diff=lfs merge=lfs -text
 *.svg filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
+packages/client/src/assets/imgs/*.png filter=lfs diff=lfs merge=lfs -text
+packages/client/src/assets/svgs/*.svg filter=lfs diff=lfs merge=lfs -text
