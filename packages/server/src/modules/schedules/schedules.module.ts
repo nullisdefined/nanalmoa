@@ -15,8 +15,8 @@ import { UsersModule } from '../users/users.module'
 import { ManagerModule } from '../manager/manager.module'
 import { GroupModule } from '../group/group.module'
 import { GroupSchedule } from '@/entities/group-schedule.entity'
-import { Multer } from 'multer'
 import { ScheduleRecurring } from '@/entities/recurring-schedule.entity'
+import { AiService } from './ai.service'
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -39,6 +39,7 @@ import { ScheduleRecurring } from '@/entities/recurring-schedule.entity'
     VoiceTranscriptionService,
     OCRTranscriptionService,
     UsersService,
+    AiService,
   ],
 })
 export class SchedulesModule {}

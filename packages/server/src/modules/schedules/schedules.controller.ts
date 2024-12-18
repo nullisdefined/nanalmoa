@@ -32,8 +32,8 @@ import { OCRTranscriptionService } from './OCR-transcription.service'
 import { AuthGuard } from '@nestjs/passport'
 import { UpdateScheduleDto } from './dto/update-schedule.dto'
 import { ManagerService } from '../manager/manager.service'
-import { Multer } from 'multer'
 import { GetUserUuid } from '@/common/decorators/get-user-uuid.decorator'
+import { AiService } from './ai.service'
 
 @ApiTags('Schedules')
 @UseGuards(AuthGuard('jwt'))
@@ -44,6 +44,7 @@ export class SchedulesController {
     private readonly schedulesService: SchedulesService,
     private readonly ocrTranscriptionService: OCRTranscriptionService,
     private readonly managerService: ManagerService,
+    private readonly aiService: AiService,
   ) {}
 
   @Get('day')
@@ -521,7 +522,7 @@ export class SchedulesController {
     @UploadedFile() file: Express.Multer.File,
     @Body('currentDateTime') currentDateTime: string,
   ): Promise<CreateScheduleDto[]> {
-    return await this.schedulesService.transcribeRTZRAndFetchResultWithGpt(
+    return await this.aiService.transcribeRTZRAndFetchResultWithGpt(
       file,
       currentDateTime,
       userUuid,
@@ -542,7 +543,7 @@ export class SchedulesController {
     @UploadedFile() file: Express.Multer.File,
     @Body('currentDateTime') currentDateTime: string,
   ): Promise<CreateScheduleDto[]> {
-    return await this.schedulesService.transcribeWhisperAndFetchResultWithGpt(
+    return await this.aiService.transcribeWhisperAndFetchResultWithGpt(
       file,
       currentDateTime,
       userUuid,
