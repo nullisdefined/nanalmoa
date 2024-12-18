@@ -1,11 +1,11 @@
 name: Client CD Pipeline
 
 on:
-  push:
+  pull_request:
     branches: [release]
     paths:
       - 'packages/client/**'
-      - 'nginx/default.conf'
+      - 'nginx/nginx.conf'
       - 'nginx/Dockerfile'
       - '.github/workflows/client-cd.yml'
 
