@@ -17,6 +17,8 @@ import { GroupModule } from '../group/group.module'
 import { GroupSchedule } from '@/entities/group-schedule.entity'
 import { ScheduleRecurring } from '@/entities/recurring-schedule.entity'
 import { AiService } from './ai.service'
+import { RecurringSchedulesService } from './recurring-schedules.service'
+import { ScheduleUtils } from './schedules.util'
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -40,6 +42,8 @@ import { AiService } from './ai.service'
     OCRTranscriptionService,
     UsersService,
     AiService,
+    RecurringSchedulesService,
+    ScheduleUtils,
   ],
 })
 export class SchedulesModule {}
