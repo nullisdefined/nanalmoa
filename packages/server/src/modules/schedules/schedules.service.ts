@@ -4,14 +4,9 @@ import { BadRequestException, Logger, NotFoundException } from '@nestjs/common'
 
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { InjectDataSource, InjectRepository } from '@nestjs/typeorm'
+import { InjectRepository } from '@nestjs/typeorm'
 import OpenAI from 'openai'
-import {
-  DataSource,
-  LessThanOrEqual,
-  MoreThanOrEqual,
-  Repository,
-} from 'typeorm'
+import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm'
 import { GroupService } from '../group/group.service'
 import { VoiceTranscriptionService } from './voice-transcription.service'
 import { UsersService } from '../users/users.service'
@@ -555,7 +550,7 @@ export class SchedulesService {
     updateScheduleDto: UpdateScheduleDto,
     instanceDate: Date,
   ): Promise<ResponseScheduleDto> {
-    const originalSchedule = { ...schedule }
+    // const originalSchedule = { ...schedule }
     const originalRecurring = { ...schedule.recurring }
 
     // 1. 기존 일정 처리
