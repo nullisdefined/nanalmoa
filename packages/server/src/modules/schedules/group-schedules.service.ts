@@ -13,6 +13,13 @@ export class GroupScheduleService {
     private schedulesRepository: Repository<Schedule>,
   ) {}
 
+  /**
+   * 특정 기간 내의 공유된 그룹 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @param startDate 시작 날짜
+   * @param endDate 종료 날짜
+   * @returns 공유된 그룹 일정 목록
+   */
   async findSharedGroupSchedules(
     userUuid: string,
     startDate: Date,
@@ -27,6 +34,12 @@ export class GroupScheduleService {
       .getMany()
   }
 
+  /**
+   * 특정 일정 ID로 공유된 그룹 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @param scheduleId 일정 ID
+   * @returns 공유된 그룹 일정
+   */
   async findSharedGroupSchedulesByScheduleId(
     userUuid: string,
     scheduleId: number,
@@ -39,6 +52,11 @@ export class GroupScheduleService {
       .getOne()
   }
 
+  /**
+   * 사용자를 그룹 일정에서 제거
+   * @param userUuid 사용자 UUID
+   * @param schedule 일정 정보
+   */
   async removeUserFromFutureGroupSchedules(
     userUuid: string,
     schedule: Schedule,

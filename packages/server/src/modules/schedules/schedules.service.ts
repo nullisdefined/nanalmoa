@@ -43,12 +43,24 @@ export class SchedulesService {
     private readonly groupScheduleService: GroupScheduleService,
   ) {}
 
+  /**
+   * 사용자의 모든 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @returns 모든 일정 목록
+   */
   async findAllByUserUuid(userUuid: string): Promise<ResponseScheduleDto[]> {
     const startDate = new Date(Date.UTC(2000, 0, 1))
     const endDate = new Date(Date.UTC(2100, 11, 31, 23, 59, 59, 999))
     return this.getSchedulesInRange(userUuid, startDate, endDate)
   }
 
+  /**
+   * 특정 월의 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @param year 연도
+   * @param month 월
+   * @returns 해당 월의 일정 목록
+   */
   async findByMonth(
     userUuid: string,
     year: number,
@@ -63,6 +75,12 @@ export class SchedulesService {
     )
   }
 
+  /**
+   * 특정 주의 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @param date 기준 날짜
+   * @returns 해당 주의 일정 목록
+   */
   async findByWeek(
     userUuid: string,
     date: string,
@@ -77,6 +95,11 @@ export class SchedulesService {
     )
   }
 
+  /**
+   * 특정 날짜의 일정을 조회
+   * @param dateQuery 날짜 조회 조건
+   * @returns 해당 날짜의 일정 목록
+   */
   async findByDate(dateQuery: WeekQueryDto): Promise<ResponseScheduleDto[]> {
     await this.usersService.getUserByUuid(dateQuery.userUuid)
     const dateRange = this.scheduleUtils.calculateDailyRange(dateQuery.date)
@@ -87,6 +110,12 @@ export class SchedulesService {
     )
   }
 
+  /**
+   * 특정 연도의 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @param year 연도
+   * @returns 해당 연도의 일정 목록
+   */
   async findByYear(
     userUuid: string,
     year: number,
@@ -100,6 +129,13 @@ export class SchedulesService {
     )
   }
 
+  /**
+   * 특정 기간의 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @param startDate 시작 날짜
+   * @param endDate 종료 날짜
+   * @returns 해당 기간의 일정 목록
+   */
   async getSchedulesInRange(
     userUuid: string,
     startDate: Date,
@@ -144,19 +180,28 @@ export class SchedulesService {
     return convertedSchedules
   }
 
+  /**
+   * 특정 일정을 ID로 조회
+   * @param id 일정 ID
+   * @returns 일정 정보
+   */
   async findOne(id: number): Promise<ResponseScheduleDto> {
     const schedule = await this.schedulesRepository.findOne({
       where: { scheduleId: id },
       relations: ['category', 'recurring'],
     })
     if (!schedule) {
-      throw new NotFoundException(
-        `해당 id : ${id}를 가진 일정을 찾을 수 없습니다.`,
-      )
+      throw new NotFoundException(`Schedule with id: ${id} not found.`)
     }
     return this.scheduleUtils.convertToResponseDto(schedule)
   }
 
+  /**
+   * 새로운 일정 생성
+   * @param userUuid 사용자 UUID
+   * @param createScheduleDto 일정 생성 정보
+   * @returns 생성된 일정 정보
+   */
   @Transactional()
   async createSchedule(
     userUuid: string,
@@ -167,7 +212,7 @@ export class SchedulesService {
     })
 
     if (!category) {
-      throw new NotFoundException('해당 카테고리가 존재하지 않습니다.')
+      throw new NotFoundException('Category not found.')
     }
 
     const startDate = new Date(createScheduleDto.startDate)
@@ -238,6 +283,15 @@ export class SchedulesService {
     return this.scheduleUtils.convertToResponseDto(savedSchedule)
   }
 
+  /**
+   * 일정 수정
+   * @param userUuid 사용자 UUID
+   * @param scheduleId 일정 ID
+   * @param updateScheduleDto 수정할 일정 정보
+   * @param instanceDate 반복 일정의 특정 날짜
+   * @param updateType 수정 타입 ('single' | 'future')
+   * @returns 수정된 일정 정보
+   */
   @Transactional()
   async updateSchedule(
     userUuid: string,
@@ -322,6 +376,12 @@ export class SchedulesService {
     return updatedSchedule
   }
 
+  /**
+   * 일반 일정 수정
+   * @param schedule 수정할 일정
+   * @param updateScheduleDto 수정할 일정 정보
+   * @returns 수정된 일정 정보
+   */
   private async updateNonRecurringSchedule(
     schedule: Schedule,
     updateScheduleDto: UpdateScheduleDto,
@@ -359,6 +419,13 @@ export class SchedulesService {
     return this.scheduleUtils.convertToResponseDto(updatedSchedule)
   }
 
+  /**
+   * 일정 삭제
+   * @param userUuid 사용자 UUID
+   * @param scheduleId 일정 ID
+   * @param instanceDate 반복 일정의 특정 날짜
+   * @param deleteType 삭제 타입 ('single' | 'future')
+   */
   @Transactional()
   async deleteSchedule(
     userUuid: string,

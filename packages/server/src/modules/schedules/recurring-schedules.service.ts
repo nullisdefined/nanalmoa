@@ -18,12 +18,19 @@ export class RecurringSchedulesService {
     private readonly scheduleUtils: ScheduleUtils,
   ) {}
 
+  /**
+   * 한 날짜의 반복 일정 업데이트
+   * @param schedule 원본 일정
+   * @param updateScheduleDto 업데이트할 일정 정보
+   * @param instanceDate 수정할 인스턴스의 날짜
+   * @returns 업데이트된 일정 정보
+   */
   public async updateSingleInstance(
     schedule: Schedule,
     updateScheduleDto: UpdateScheduleDto,
     instanceDate: Date,
   ): Promise<ResponseScheduleDto> {
-    // 1. 원본 반복 일정의 종료일을 수정 날짜 전날로 변경
+    // 원본 반복 일정의 종료일을 수정 날짜 전날로 변경
     const originalEndDate = schedule.recurring.repeatEndDate
     const modifiedEndDate = new Date(
       instanceDate.getTime() - 24 * 60 * 60 * 1000,
@@ -32,7 +39,7 @@ export class RecurringSchedulesService {
       repeatEndDate: modifiedEndDate,
     })
 
-    // 2. 수정하려는 날짜의 단일 일정 생성
+    // 수정하려는 날짜의 단일 일정 생성
     const singleInstance = this.schedulesRepository.create({
       ...schedule,
       ...updateScheduleDto,
@@ -60,7 +67,7 @@ export class RecurringSchedulesService {
     const savedSingleInstance =
       await this.schedulesRepository.save(singleInstance)
 
-    // 3. 다음 날부터 시작하는 새로운 반복 일정 생성
+    // 다음 날부터 시작하는 새로운 반복 일정 생성
     const nextDay = new Date(instanceDate)
     nextDay.setDate(nextDay.getDate() + 1)
     nextDay.setUTCHours(
@@ -88,7 +95,7 @@ export class RecurringSchedulesService {
     const savedNewSchedule =
       await this.schedulesRepository.save(newRecurringSchedule)
 
-    // 4. 새로운 반복 정보 생성
+    // 새로운 반복 정보 생성
     const newRecurring = this.recurringRepository.create({
       scheduleId: savedNewSchedule.scheduleId,
       repeatType: schedule.recurring.repeatType,
@@ -108,6 +115,13 @@ export class RecurringSchedulesService {
     return this.scheduleUtils.convertToResponseDto(savedSingleInstance)
   }
 
+  /**
+   * 특정 날짜 이후의 모든 반복 일정을 업데이트
+   * @param schedule 원본 일정
+   * @param updateScheduleDto 업데이트할 일정 정보
+   * @param instanceDate 수정 시작 날짜
+   * @returns 업데이트된 일정 정보
+   */
   public async updateFutureInstances(
     schedule: Schedule,
     updateScheduleDto: UpdateScheduleDto,
@@ -116,7 +130,7 @@ export class RecurringSchedulesService {
     // const originalSchedule = { ...schedule }
     const originalRecurring = { ...schedule.recurring }
 
-    // 1. 기존 일정 처리
+    // 기존 일정 처리
     if (instanceDate.getTime() === schedule.startDate.getTime()) {
       // 시작일부터 수정하는 경우, 기존 recurring 정보를 먼저 삭제
       await this.recurringRepository.delete({
@@ -133,7 +147,7 @@ export class RecurringSchedulesService {
       })
     }
 
-    // 2. 새로운 일정 생성
+    // 새로운 일정 생성
     const newSchedule = this.schedulesRepository.create({
       userUuid: schedule.userUuid,
       category: schedule.category,
@@ -162,10 +176,10 @@ export class RecurringSchedulesService {
       newSchedule.endDate = new Date(newSchedule.startDate.getTime() + duration)
     }
 
-    // 3. 새로운 일정 저장
+    // 새로운 일정 저장
     const savedNewSchedule = await this.schedulesRepository.save(newSchedule)
 
-    // 4. 새로운 반복 정보 생성 및 저장
+    // 새로운 반복 정보 생성 및 저장
     const newRecurring = this.recurringRepository.create({
       scheduleId: savedNewSchedule.scheduleId,
       repeatType:
@@ -197,6 +211,11 @@ export class RecurringSchedulesService {
     return this.scheduleUtils.convertToResponseDto(savedNewSchedule)
   }
 
+  /**
+   * 특정 날짜 이후의 모든 반복 일정을 삭제
+   * @param schedule 삭제할 일정
+   * @param targetDate 삭제 시작 날짜
+   */
   public async deleteFutureInstances(
     schedule: Schedule,
     targetDate: Date,
@@ -220,11 +239,16 @@ export class RecurringSchedulesService {
     }
   }
 
+  /**
+   * 반복 일정의 단일 인스턴스를 삭제
+   * @param schedule 삭제할 일정
+   * @param targetDate 삭제할 날짜
+   */
   public async deleteSingleInstance(
     schedule: Schedule,
     targetDate: Date,
   ): Promise<void> {
-    // 1. 기존 일정의 반복 패턴 종료일을 하루 전으로 수정
+    // 기존 일정의 반복 패턴 종료일을 하루 전으로 수정
     const originalRecurring = { ...schedule.recurring }
     const modifiedEndDate = new Date(targetDate.getTime() - 24 * 60 * 60 * 1000)
     modifiedEndDate.setUTCHours(23, 59, 59, 999)
@@ -234,7 +258,7 @@ export class RecurringSchedulesService {
       repeatEndDate: modifiedEndDate,
     })
 
-    // 2. 다음날부터의 새로운 반복 일정 생성
+    // 다음날부터의 새로운 반복 일정 생성
     const nextStartDate = this.getNextOccurrenceDate(schedule, targetDate)
     if (nextStartDate <= originalRecurring.repeatEndDate) {
       // 새로운 일정 생성
@@ -270,6 +294,11 @@ export class RecurringSchedulesService {
     }
   }
 
+  /**
+   * 사용자의 모든 반복 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @returns 반복 일정 목록
+   */
   public async findRecurringSchedules(userUuid: string): Promise<Schedule[]> {
     return this.schedulesRepository.find({
       where: { userUuid, isRecurring: true },
@@ -277,6 +306,13 @@ export class RecurringSchedulesService {
     })
   }
 
+  /**
+   * 특정 기간 내의 일반 일정을 조회
+   * @param userUuid 사용자 UUID
+   * @param startDate 시작 날짜
+   * @param endDate 종료 날짜
+   * @returns 일정 목록
+   */
   public async findRegularSchedulesInRange(
     userUuid: string,
     startDate: Date,
@@ -293,6 +329,13 @@ export class RecurringSchedulesService {
     })
   }
 
+  /**
+   * 반복 일정을 특정 기간 내의 개별 일정으로 확장
+   * @param schedules 반복 일정 목록
+   * @param startDate 시작 날짜
+   * @param endDate 종료 날짜
+   * @returns 확장된 일정 목록
+   */
   public expandRecurringSchedules(
     schedules: Schedule[],
     startDate: Date,
@@ -332,6 +375,12 @@ export class RecurringSchedulesService {
     return expandedSchedules
   }
 
+  /**
+   * 주어진 날짜가 반복 일정의 발생일인지 확인
+   * @param schedule 반복 일정
+   * @param date 확인할 날짜
+   * @returns 발생일 여부
+   */
   public isOccurrenceDate(schedule: Schedule, date: Date): boolean {
     if (!schedule.recurring) return false
 
@@ -352,6 +401,12 @@ export class RecurringSchedulesService {
     }
   }
 
+  /**
+   * 다음 반복 일정 발생일을 계산
+   * @param schedule 반복 일정
+   * @param currentDate 현재 날짜
+   * @returns 다음 발생일
+   */
   public getNextOccurrenceDate(schedule: Schedule, currentDate: Date): Date {
     const nextDate = new Date(currentDate)
     const recurring = schedule.recurring
@@ -380,6 +435,12 @@ export class RecurringSchedulesService {
     return nextDate
   }
 
+  /**
+   * 반복 일정의 단일 인스턴스 생성
+   * @param schedule 원본 일정
+   * @param startDate 시작 날짜
+   * @returns 생성된 일정 인스턴스
+   */
   public createOccurrence(schedule: Schedule, startDate: Date): Schedule {
     const duration = schedule.endDate.getTime() - schedule.startDate.getTime()
     const endDate = new Date(startDate.getTime() + duration)
@@ -397,6 +458,10 @@ export class RecurringSchedulesService {
     return occurrence
   }
 
+  /**
+   * 반복 일정 옵션의 유효성 검사
+   * @param recurringOptions 반복 일정 옵션
+   */
   public validateRecurringOptions(recurringOptions: RecurringInfo) {
     const {
       repeatType,
