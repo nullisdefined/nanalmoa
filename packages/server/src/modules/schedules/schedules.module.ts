@@ -19,6 +19,7 @@ import { ScheduleRecurring } from '@/entities/recurring-schedule.entity'
 import { AiService } from './ai.service'
 import { RecurringSchedulesService } from './recurring-schedules.service'
 import { ScheduleUtils } from './schedules.util'
+import { GroupScheduleService } from './group-schedules.service'
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -45,6 +46,7 @@ import { ScheduleUtils } from './schedules.util'
     AiService,
     RecurringSchedulesService,
     ScheduleUtils,
+    GroupScheduleService,
   ],
 })
 export class SchedulesModule {}
