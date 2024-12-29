@@ -58,8 +58,10 @@ export class AiService {
     const formattedDate = await this.formatDateToYYYYMMDDHHMMSS(
       new Date(currentDateTime),
     )
-
-    const gptResponse = await this.openai.chat.completions.create({
+    const openai = new OpenAI({
+      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
+    })
+    const gptResponse = await openai.chat.completions.create({
       model: this.configService.get<string>('OPENAI_FINETUNING_MODEL'),
       messages: [
         {
@@ -84,7 +86,10 @@ export class AiService {
    * OCR 결과를 OpenAI GPT 모델에 넘겨서 처리합니다.
    */
   async processWithGptOCR(OCRResult: string): Promise<any> {
-    const gptResponse = await this.openai.chat.completions.create({
+    const openai = new OpenAI({
+      apiKey: this.configService.get<string>('OPENAI_API_KEY_OCR'),
+    })
+    const gptResponse = await openai.chat.completions.create({
       model: this.configService.get<string>('OPENAI_FINETUNING_MODEL_OCR'),
       messages: [
         {
