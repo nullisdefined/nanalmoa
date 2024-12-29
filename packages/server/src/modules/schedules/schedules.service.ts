@@ -10,15 +10,13 @@ import { GroupService } from '../group/group.service'
 import { VoiceTranscriptionService } from './voice-transcription.service'
 import { UsersService } from '../users/users.service'
 import { GroupSchedule } from '@/entities/group-schedule.entity'
-import {
-  ResponseGroupInfo,
-  ResponseScheduleDto,
-} from './dto/response-schedule.dto'
+import { ResponseScheduleDto } from './dto/response-schedule.dto'
 import { WeekQueryDto } from './dto/week-query-schedule.dto'
 import { CreateScheduleDto, RecurringInfo } from './dto/create-schedule.dto'
 import { UpdateScheduleDto } from './dto/update-schedule.dto'
 import { Category } from '@/entities/category.entity'
 import { Transactional } from 'typeorm-transactional'
+import { RecurringSchedulesService } from './recurring-schedules.service'
 import { ScheduleUtils } from './schedules.util'
 
 @Injectable()
@@ -39,11 +37,9 @@ export class SchedulesService {
     @InjectRepository(GroupSchedule)
     private groupScheduleRepository: Repository<GroupSchedule>,
     private groupService: GroupService,
+    private readonly recurringSchedulesService: RecurringSchedulesService,
     private readonly scheduleUtils: ScheduleUtils,
-  ) {
-    const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY')
-    this.openai = new OpenAI({ apiKey: openaiApiKey })
-  }
+  ) {}
 
   // 일정 조회 관련 메서드
 
@@ -140,7 +136,9 @@ export class SchedulesService {
     allSchedules.sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
 
     const convertedSchedules = await Promise.all(
-      allSchedules.map((schedule) => this.convertToResponseDto(schedule)),
+      allSchedules.map((schedule) =>
+        this.scheduleUtils.convertToResponseDto(schedule),
+      ),
     )
 
     return convertedSchedules
@@ -159,7 +157,7 @@ export class SchedulesService {
         `해당 id : ${id}를 가진 일정을 찾을 수 없습니다.`,
       )
     }
-    return this.convertToResponseDto(schedule)
+    return this.scheduleUtils.convertToResponseDto(schedule)
   }
 
   // 공유된 일정을 파악하는 함수.
@@ -188,8 +186,6 @@ export class SchedulesService {
       .andWhere('schedule.scheduleId = :scheduleId', { scheduleId })
       .getOne()
   }
-
-  // 일정 생성 및 수정 관련 메서드
 
   /**
    * 새로운 일정을 생성합니다.
@@ -270,7 +266,7 @@ export class SchedulesService {
       )
     }
 
-    return this.convertToResponseDto(savedSchedule)
+    return this.scheduleUtils.convertToResponseDto(savedSchedule)
   }
 
   /**
@@ -370,12 +366,12 @@ export class SchedulesService {
       // 반복 일정 수정
       updatedSchedule =
         updateType === 'single'
-          ? await this.updateSingleInstance(
+          ? await this.recurringSchedulesService.updateSingleInstance(
               schedule,
               updateScheduleDto,
               instanceDate,
             )
-          : await this.updateFutureInstances(
+          : await this.recurringSchedulesService.updateFutureInstances(
               schedule,
               updateScheduleDto,
               instanceDate,
@@ -441,191 +437,7 @@ export class SchedulesService {
     // 변경된 일정 저장
     const updatedSchedule = await this.schedulesRepository.save(schedule)
 
-    return this.convertToResponseDto(updatedSchedule)
-  }
-
-  /**
-   * 특정 날짜의 반복 일정을 수정합니다.
-   */
-  private async updateSingleInstance(
-    schedule: Schedule,
-    updateScheduleDto: UpdateScheduleDto,
-    instanceDate: Date,
-  ): Promise<ResponseScheduleDto> {
-    // 1. 원본 반복 일정의 종료일을 수정 날짜 전날로 변경
-    const originalEndDate = schedule.recurring.repeatEndDate
-    const modifiedEndDate = new Date(
-      instanceDate.getTime() - 24 * 60 * 60 * 1000,
-    )
-    await this.recurringRepository.update(schedule.recurring.recurringId, {
-      repeatEndDate: modifiedEndDate,
-    })
-
-    // 2. 수정하려는 날짜의 단일 일정 생성
-    const singleInstance = this.schedulesRepository.create({
-      ...schedule,
-      ...updateScheduleDto,
-      scheduleId: undefined,
-      isRecurring: false,
-      recurring: null,
-      startDate: new Date(instanceDate),
-      endDate: new Date(instanceDate),
-    })
-
-    // 시간 설정
-    singleInstance.startDate.setUTCHours(
-      updateScheduleDto.startDate?.getUTCHours() ??
-        schedule.startDate.getUTCHours(),
-      updateScheduleDto.startDate?.getUTCMinutes() ??
-        schedule.startDate.getUTCMinutes(),
-    )
-    singleInstance.endDate.setUTCHours(
-      updateScheduleDto.endDate?.getUTCHours() ??
-        schedule.endDate.getUTCHours(),
-      updateScheduleDto.endDate?.getUTCMinutes() ??
-        schedule.endDate.getUTCMinutes(),
-    )
-
-    const savedSingleInstance =
-      await this.schedulesRepository.save(singleInstance)
-
-    // 3. 다음 날부터 시작하는 새로운 반복 일정 생성
-    const nextDay = new Date(instanceDate)
-    nextDay.setDate(nextDay.getDate() + 1)
-    nextDay.setUTCHours(
-      schedule.startDate.getUTCHours(),
-      schedule.startDate.getUTCMinutes(),
-      0,
-      0,
-    )
-
-    const endTime = schedule.endDate.getTime() - schedule.startDate.getTime()
-    const nextDayEnd = new Date(nextDay.getTime() + endTime)
-
-    const newRecurringSchedule = this.schedulesRepository.create({
-      userUuid: schedule.userUuid,
-      category: schedule.category,
-      title: schedule.title,
-      place: schedule.place,
-      memo: schedule.memo,
-      isAllDay: schedule.isAllDay,
-      startDate: nextDay,
-      endDate: nextDayEnd,
-      isRecurring: true,
-    })
-
-    const savedNewSchedule =
-      await this.schedulesRepository.save(newRecurringSchedule)
-
-    // 4. 새로운 반복 정보 생성
-    const newRecurring = this.recurringRepository.create({
-      scheduleId: savedNewSchedule.scheduleId,
-      repeatType: schedule.recurring.repeatType,
-      repeatEndDate: originalEndDate,
-      recurringInterval: schedule.recurring.recurringInterval,
-      recurringDaysOfWeek: schedule.recurring.recurringDaysOfWeek,
-      recurringDayOfMonth: schedule.recurring.recurringDayOfMonth,
-      recurringMonthOfYear: schedule.recurring.recurringMonthOfYear,
-    })
-
-    const savedRecurring = await this.recurringRepository.save(newRecurring)
-
-    // 관계 설정
-    savedNewSchedule.recurring = savedRecurring
-    await this.schedulesRepository.save(savedNewSchedule)
-
-    return this.convertToResponseDto(savedSingleInstance)
-  }
-
-  /**
-   * 특정 날짜 이후의 반복 일정을 수정합니다.
-   */
-  private async updateFutureInstances(
-    schedule: Schedule,
-    updateScheduleDto: UpdateScheduleDto,
-    instanceDate: Date,
-  ): Promise<ResponseScheduleDto> {
-    const originalRecurring = { ...schedule.recurring }
-
-    // 1. 기존 일정 처리
-    if (instanceDate.getTime() === schedule.startDate.getTime()) {
-      // 시작일부터 수정하는 경우, 기존 recurring 정보를 먼저 삭제
-      await this.recurringRepository.delete({
-        scheduleId: schedule.scheduleId,
-      })
-      await this.schedulesRepository.remove(schedule)
-    } else {
-      // 중간 날짜부터 수정하는 경우, 기존 일정의 반복 종료일 수정
-      const updatedRepeatEndDate = new Date(instanceDate)
-      updatedRepeatEndDate.setUTCDate(updatedRepeatEndDate.getUTCDate() - 1)
-      updatedRepeatEndDate.setUTCHours(23, 59, 59, 999)
-      await this.recurringRepository.update(originalRecurring.recurringId, {
-        repeatEndDate: updatedRepeatEndDate,
-      })
-    }
-
-    // 2. 새로운 일정 생성
-    const newSchedule = this.schedulesRepository.create({
-      userUuid: schedule.userUuid,
-      category: schedule.category,
-      title: updateScheduleDto.title ?? schedule.title,
-      place: updateScheduleDto.place ?? schedule.place,
-      memo: updateScheduleDto.memo ?? schedule.memo,
-      isAllDay: updateScheduleDto.isAllDay ?? schedule.isAllDay,
-      startDate: new Date(instanceDate),
-      isRecurring: true,
-    })
-
-    // 시간 설정
-    newSchedule.startDate.setUTCHours(
-      updateScheduleDto.startDate?.getUTCHours() ??
-        schedule.startDate.getUTCHours(),
-      updateScheduleDto.startDate?.getUTCMinutes() ??
-        schedule.startDate.getUTCMinutes(),
-      0,
-      0,
-    )
-
-    if (updateScheduleDto.endDate) {
-      newSchedule.endDate = new Date(updateScheduleDto.endDate)
-    } else {
-      const duration = schedule.endDate.getTime() - schedule.startDate.getTime()
-      newSchedule.endDate = new Date(newSchedule.startDate.getTime() + duration)
-    }
-
-    // 3. 새로운 일정 저장
-    const savedNewSchedule = await this.schedulesRepository.save(newSchedule)
-
-    // 4. 새로운 반복 정보 생성 및 저장
-    const newRecurring = this.recurringRepository.create({
-      scheduleId: savedNewSchedule.scheduleId,
-      repeatType:
-        updateScheduleDto.recurringOptions?.repeatType ??
-        originalRecurring.repeatType,
-      repeatEndDate:
-        updateScheduleDto.recurringOptions?.repeatEndDate ??
-        originalRecurring.repeatEndDate,
-      recurringInterval:
-        updateScheduleDto.recurringOptions?.recurringInterval ??
-        originalRecurring.recurringInterval,
-      recurringDaysOfWeek:
-        updateScheduleDto.recurringOptions?.recurringDaysOfWeek ??
-        originalRecurring.recurringDaysOfWeek,
-      recurringDayOfMonth:
-        updateScheduleDto.recurringOptions?.recurringDayOfMonth ??
-        originalRecurring.recurringDayOfMonth,
-      recurringMonthOfYear:
-        updateScheduleDto.recurringOptions?.recurringMonthOfYear ??
-        originalRecurring.recurringMonthOfYear,
-    })
-
-    const savedRecurring = await this.recurringRepository.save(newRecurring)
-
-    // 5. 관계 설정 및 최종 저장
-    savedNewSchedule.recurring = savedRecurring
-    await this.schedulesRepository.save(savedNewSchedule)
-
-    return this.convertToResponseDto(savedNewSchedule)
+    return this.scheduleUtils.convertToResponseDto(updatedSchedule)
   }
 
   /**
@@ -674,9 +486,15 @@ export class SchedulesService {
 
       if (isCreator) {
         if (deleteType === 'future') {
-          await this.deleteFutureInstances(schedule, targetDate)
+          await this.recurringSchedulesService.deleteFutureInstances(
+            schedule,
+            targetDate,
+          )
         } else {
-          await this.deleteSingleInstance(schedule, targetDate)
+          await this.recurringSchedulesService.deleteSingleInstance(
+            schedule,
+            targetDate,
+          )
         }
       } else {
         // 공유 받은 사용자라면 해당 날짜 이후의 그룹 일정에서만 제거
@@ -732,59 +550,6 @@ export class SchedulesService {
       await this.recurringRepository.update(schedule.recurring.recurringId, {
         repeatEndDate: modifiedEndDate,
       })
-    }
-  }
-
-  /**
-   * 특정 날짜의 반복 일정 삭제
-   */
-  private async deleteSingleInstance(
-    schedule: Schedule,
-    targetDate: Date,
-  ): Promise<void> {
-    // 1. 기존 일정의 반복 패턴 종료일을 하루 전으로 수정
-    const originalRecurring = { ...schedule.recurring }
-    const modifiedEndDate = new Date(targetDate.getTime() - 24 * 60 * 60 * 1000)
-    modifiedEndDate.setUTCHours(23, 59, 59, 999)
-
-    // 기존 recurring 정보 수정
-    await this.recurringRepository.update(originalRecurring.recurringId, {
-      repeatEndDate: modifiedEndDate,
-    })
-
-    // 2. 다음날부터의 새로운 반복 일정 생성
-    const nextStartDate = this.getNextOccurrenceDate(schedule, targetDate)
-    if (nextStartDate <= originalRecurring.repeatEndDate) {
-      // 새로운 일정 생성
-      const newSchedule = this.schedulesRepository.create({
-        userUuid: schedule.userUuid,
-        category: schedule.category,
-        title: schedule.title,
-        place: schedule.place,
-        memo: schedule.memo,
-        isAllDay: schedule.isAllDay,
-        startDate: nextStartDate,
-        endDate: new Date(
-          nextStartDate.getTime() +
-            (schedule.endDate.getTime() - schedule.startDate.getTime()),
-        ),
-        isRecurring: true,
-      })
-
-      const savedNewSchedule = await this.schedulesRepository.save(newSchedule)
-
-      // 새로운 recurring 정보 생성
-      const newRecurring = this.recurringRepository.create({
-        scheduleId: savedNewSchedule.scheduleId,
-        repeatType: originalRecurring.repeatType,
-        repeatEndDate: originalRecurring.repeatEndDate,
-        recurringInterval: originalRecurring.recurringInterval,
-        recurringDaysOfWeek: originalRecurring.recurringDaysOfWeek,
-        recurringDayOfMonth: originalRecurring.recurringDayOfMonth,
-        recurringMonthOfYear: originalRecurring.recurringMonthOfYear,
-      })
-
-      await this.recurringRepository.save(newRecurring)
     }
   }
 
@@ -939,182 +704,4 @@ export class SchedulesService {
       )
     }
   }
-
-  private async convertToResponseDto(
-    schedule: Schedule,
-  ): Promise<ResponseScheduleDto> {
-    const groupSchedules = await this.groupScheduleRepository.find({
-      where: { schedule: { scheduleId: schedule.scheduleId } },
-      relations: ['group', 'user'],
-    })
-
-    const groupMap = new Map<number, ResponseGroupInfo>()
-
-    groupSchedules.forEach((groupSchedule) => {
-      const { group, user } = groupSchedule
-      if (!groupMap.has(group.groupId)) {
-        groupMap.set(group.groupId, {
-          groupId: group.groupId,
-          groupName: group.groupName,
-          users: [],
-        })
-      }
-      groupMap.get(group.groupId).users.push({
-        userUuid: user.userUuid,
-        name: user.name,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        profileImage: user.profileImage,
-      })
-    })
-
-    const groupInfo = Array.from(groupMap.values())
-
-    return new ResponseScheduleDto({
-      scheduleId: schedule.scheduleId,
-      userUuid: schedule.userUuid,
-      category: schedule.category,
-      title: schedule.title,
-      place: schedule.place,
-      memo: schedule.memo,
-      startDate: schedule.startDate,
-      endDate: schedule.endDate,
-      isAllDay: schedule.isAllDay,
-      recurring: schedule.recurring,
-      groupInfo: groupInfo.length > 0 ? groupInfo : undefined,
-    })
-  }
-
-  // GPT 관련 메서드
-
-  // /**
-  //  * GPT 응답을 파싱합니다.
-  //  */
-  // parseGptResponse(response: string): any[] {
-  //   try {
-  //     return JSON.parse(response)
-  //   } catch (error) {
-  //     console.error('Error parsing GPT response:', error)
-  //     throw new Error('Failed to parse GPT response')
-  //   }
-  // }
-
-  // /**
-  //  * 전사 데이터를 OpenAI GPT 모델에 넘겨서 처리합니다.
-  //  */
-  // private async processWithGpt(
-  //   transcriptionResult: any,
-  //   currentDateTime: string,
-  // ): Promise<CreateScheduleDto[]> {
-  //   const formattedDate = await this.formatDateToYYYYMMDDHHMMSS(
-  //     new Date(currentDateTime),
-  //   )
-
-  //   const gptResponse = await this.openai.chat.completions.create({
-  //     model: this.configService.get<string>('OPENAI_FINETUNING_MODEL'),
-  //     messages: [
-  //       {
-  //         role: 'system',
-  //         content:
-  //           'You are an AI assistant that extracts startDate, endDate, title, place, isAllDay, and category information from conversations. 카테고리[병원, 복약, 가족, 종교, 운동, 경조사, 기타]',
-  //       },
-  //       {
-  //         role: 'user',
-  //         content: `{Today : ${formattedDate}, conversations : ${transcriptionResult}}`,
-  //       },
-  //     ],
-  //   })
-  //   const gptResponseContent = gptResponse.choices[0].message.content
-  //   console.log(gptResponseContent)
-
-  //   const parsedResponse = this.parseGptResponse(gptResponseContent)
-  //   return this.convertGptResponseToCreateScheduleDto(parsedResponse)
-  // }
-
-  // /**
-  //  * OCR 결과를 OpenAI GPT 모델에 넘겨서 처리합니다.
-  //  */
-  // async processWithGptOCR(OCRResult: string): Promise<any> {
-  //   const gptResponse = await this.openai.chat.completions.create({
-  //     model: this.configService.get<string>('OPENAI_FINETUNING_MODEL_OCR'),
-  //     messages: [
-  //       {
-  //         role: 'system',
-  //         content:
-  //           'You are an AI assistant that extracts startDate, endDate, category, intent, isAllDay and place information from conversations. 카테고리[병원, 복약, 가족, 종교, 운동, 경조사, 기타]',
-  //       },
-  //       {
-  //         role: 'user',
-  //         content: `${OCRResult}`,
-  //       },
-  //     ],
-  //     max_tokens: 1000,
-  //     temperature: 0,
-  //   })
-
-  //   const gptResponseContent = gptResponse.choices[0].message.content
-  //   return this.parseGptResponse(gptResponseContent)
-  // }
-
-  // /**
-  //  * 날짜를 YYYY-MM-DD HH:mm:ss 형식으로 변환합니다.
-  //  */
-  // private async formatDateToYYYYMMDDHHMMSS(date: Date): Promise<string> {
-  //   const year = date.getFullYear()
-  //   const month = String(date.getMonth() + 1).padStart(2, '0')
-  //   const day = String(date.getDate()).padStart(2, '0')
-  //   const hours = String(date.getHours()).padStart(2, '0')
-  //   const minutes = String(date.getMinutes()).padStart(2, '0')
-  //   const seconds = String(date.getSeconds()).padStart(2, '0')
-  //   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-  // }
-
-  // private async convertGptResponseToCreateScheduleDto(
-  //   gptEvents: any[],
-  // ): Promise<CreateScheduleDto[]> {
-  //   const allCategories = await this.categoryRepository.find()
-  //   const categoryMap = allCategories.reduce((acc, category) => {
-  //     acc[category.categoryName] = category.categoryId
-  //     return acc
-  //   }, {})
-  //   console.log(gptEvents)
-  //   return gptEvents.map((event) => {
-  //     const dto = new CreateScheduleDto()
-  //     dto.startDate = new Date(event.startDate)
-  //     dto.endDate = new Date(event.endDate)
-  //     dto.title = event.intent || event.title || '새로운 일정'
-  //     dto.place = event.place || ''
-  //     dto.isAllDay = event.isAllDay || false
-  //     dto.categoryId = categoryMap[event.category] || 7 // 7은 '기타' 카테고리의 ID로 가정
-  //     return dto
-  //   })
-  // }
-
-  // /**
-  //  * RTZR을 사용하여 음성을 전사하고 GPT로 처리합니다.
-  //  */
-  // async transcribeRTZRAndFetchResultWithGpt(
-  //   file: Express.Multer.File,
-  //   currentDateTime: string,
-  //   userUuid: string,
-  // ) {
-  //   await this.validateUser(userUuid)
-  //   const transcribe =
-  //     await this.voiceTranscriptionService.RTZRTranscribeResult(file)
-  //   return this.processWithGpt(transcribe, currentDateTime)
-  // }
-
-  // /**
-  //  * Whisper를 사용하여 음성을 전사하고 GPT로 처리합니다.
-  //  */
-  // async transcribeWhisperAndFetchResultWithGpt(
-  //   file: Express.Multer.File,
-  //   currentDateTime: string,
-  //   userUuid: string,
-  // ) {
-  //   await this.validateUser(userUuid)
-  //   const transcribe =
-  //     await this.voiceTranscriptionService.whisperTranscribeResult(file)
-  //   return this.processWithGpt(transcribe, currentDateTime)
-  // }
 }

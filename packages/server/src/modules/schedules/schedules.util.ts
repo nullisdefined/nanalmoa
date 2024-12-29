@@ -1,6 +1,3 @@
-/**
- * 일정 관련 유틸리티 클래스
- */
 import { GroupSchedule } from '@/entities/group-schedule.entity'
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
