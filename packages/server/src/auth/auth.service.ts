@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import axios from 'axios'
 import { Auth, AuthProvider } from 'src/entities/auth.entity'
 import { User } from 'src/entities/user.entity'
-import { MoreThan, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { v4 as uuidv4 } from 'uuid'
 import { CoolSmsService } from './coolsms.service'
 import { ConfigService } from '@nestjs/config'
@@ -244,7 +244,11 @@ export class AuthService {
       )
       return result
     } catch (error) {
-      console.error('인증 코드 전송 실패:', error)
+      if (error instanceof Error) {
+        console.error(error.message)
+      } else {
+        console.error('unknown error', error)
+      }
       // 전송 실패 시 저장된 코드 삭제
       this.verificationCodes.delete(phoneNumber)
       return false
@@ -304,6 +308,11 @@ export class AuthService {
         refresh_token: response.data.refresh_token,
       }
     } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message)
+      } else {
+        console.error('unknown error', error)
+      }
       throw new UnauthorizedException('네이버 토큰 획득에 실패했습니다.')
     }
   }
@@ -316,6 +325,11 @@ export class AuthService {
       })
       return response.data.response
     } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message)
+      } else {
+        console.error('unknown error', error)
+      }
       throw new UnauthorizedException('네이버 사용자 정보 획득에 실패했습니다.')
     }
   }
@@ -338,6 +352,11 @@ export class AuthService {
         refresh_token: response.data.refresh_token,
       }
     } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message)
+      } else {
+        console.error('unknown error', error)
+      }
       throw new UnauthorizedException('네이버 토큰 갱신에 실패했습니다.')
     }
   }
@@ -359,6 +378,11 @@ export class AuthService {
         refresh_token: response.data.refresh_token,
       }
     } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message)
+      } else {
+        console.error('unknown error', error)
+      }
       throw new UnauthorizedException('카카오 토큰 획득에 실패했습니다.')
     }
   }
@@ -371,6 +395,11 @@ export class AuthService {
       })
       return response.data
     } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message)
+      } else {
+        console.error('unknown error', error)
+      }
       throw new UnauthorizedException('카카오 사용자 정보 획득에 실패했습니다.')
     }
   }
@@ -393,6 +422,11 @@ export class AuthService {
         refresh_token: response.data.refresh_token, // 새 리프레시 토큰 발급
       }
     } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message)
+      } else {
+        console.error('unknown error', error)
+      }
       throw new UnauthorizedException('카카오 토큰 갱신에 실패했습니다.')
     }
   }
@@ -418,7 +452,7 @@ export class AuthService {
       throw new UnauthorizedException('지원하지 않는 소셜 프로바이더입니다.')
     }
 
-    let auth = await this.authRepository.findOne({
+    const auth = await this.authRepository.findOne({
       where: {
         oauthId: oauthId,
         authProvider: provider,
@@ -551,6 +585,11 @@ export class AuthService {
         refreshToken: newTokens.refresh_token,
       }
     } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message)
+      } else {
+        console.error('unknown error', error)
+      }
       await this.authRepository.update(auth.authId, { refreshToken: null })
       throw new UnauthorizedException('토큰 갱신에 실패했습니다.')
     }
