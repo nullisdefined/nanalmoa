@@ -27,6 +27,9 @@ import {
 import * as nodemailer from 'nodemailer'
 import * as path from 'path'
 import * as fs from 'fs'
+import { KakaoUserResponse } from './types/kakao-user-response.interface'
+import { NaverUserResponse } from './types/naver-user-response.interface'
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -317,7 +320,7 @@ export class AuthService {
     }
   }
 
-  async getNaverUserInfo(accessToken: string): Promise<any> {
+  async getNaverUserInfo(accessToken: string): Promise<NaverUserResponse> {
     const userInfoUrl = 'https://openapi.naver.com/v1/nid/me'
     try {
       const response = await axios.get(userInfoUrl, {
@@ -387,7 +390,7 @@ export class AuthService {
     }
   }
 
-  async getKakaoUserInfo(accessToken: string): Promise<any> {
+  async getKakaoUserInfo(accessToken: string): Promise<KakaoUserResponse> {
     const userInfoUrl = 'https://kapi.kakao.com/v2/user/me'
     try {
       const response = await axios.get(userInfoUrl, {
@@ -432,7 +435,7 @@ export class AuthService {
   }
 
   async findOrCreateSocialUser(
-    socialUser: any,
+    socialUser: NaverUserResponse | KakaoUserResponse,
     refreshToken: string,
     provider: AuthProvider,
   ): Promise<User> {
@@ -440,9 +443,9 @@ export class AuthService {
 
     if (provider === AuthProvider.KAKAO) {
       oauthId = socialUser.id.toString()
-      name = socialUser.properties?.nickname
-      email = socialUser.kakao_account?.email
-      profileImage = socialUser.properties?.profile_image
+      name = socialUser.name
+      email = socialUser.email
+      profileImage = socialUser.profile_image
     } else if (provider === AuthProvider.NAVER) {
       oauthId = socialUser.id
       name = socialUser.name
@@ -503,7 +506,7 @@ export class AuthService {
   }
 
   async createSocialUser(
-    socialUser: any,
+    socialUser: NaverUserResponse | KakaoUserResponse,
     refreshToken: string,
     provider: AuthProvider,
   ): Promise<User> {
@@ -511,7 +514,7 @@ export class AuthService {
       userUuid: uuidv4(),
       name: socialUser.name,
       email: socialUser.email,
-      profileImage: socialUser.profileImage,
+      profileImage: socialUser.profile_image,
     })
     await this.userRepository.save(newUser)
 
