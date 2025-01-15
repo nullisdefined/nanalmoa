@@ -29,7 +29,6 @@ import * as path from 'path'
 import * as fs from 'fs'
 import { KakaoUserResponse } from './types/kakao-user-response.interface'
 import { NaverUserResponse } from './types/naver-user-response.interface'
-
 @Injectable()
 export class AuthService {
   constructor(

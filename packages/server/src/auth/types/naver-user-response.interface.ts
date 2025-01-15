@@ -1,6 +1,10 @@
+import { AuthProvider } from 'src/entities/auth.entity'
+
 export interface NaverUserResponse {
   id: string
-  name: string
+  provider: AuthProvider
+  providerId: string
   email: string
-  profile_image?: string
+  name: string
+  profileImage: string
 }
