@@ -444,12 +444,12 @@ export class AuthService {
       oauthId = socialUser.id.toString()
       name = socialUser.name
       email = socialUser.email
-      profileImage = socialUser.profile_image
+      profileImage = socialUser.profileImage
     } else if (provider === AuthProvider.NAVER) {
       oauthId = socialUser.id
       name = socialUser.name
       email = socialUser.email
-      profileImage = socialUser.profile_image
+      profileImage = socialUser.profileImage
     } else {
       throw new UnauthorizedException('지원하지 않는 소셜 프로바이더입니다.')
     }
@@ -513,7 +513,7 @@ export class AuthService {
       userUuid: uuidv4(),
       name: socialUser.name,
       email: socialUser.email,
-      profileImage: socialUser.profile_image,
+      profileImage: socialUser.profileImage,
     })
     await this.userRepository.save(newUser)
 
