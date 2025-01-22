@@ -1,12 +1,14 @@
 name: Client CD Pipeline
 
 on:
-  pull_request:
+  push:
     branches: [release]
     paths:
       - 'packages/client/**'
-      - 'nginx/nginx.conf'
-      - 'nginx/Dockerfile'
+      - 'nginx/nginx/**'
+      - 'compose.yaml'
+      - 'package.json'
+      - 'yarn.lock'
       - '.github/workflows/client-cd.yml'
 
 jobs:
@@ -18,24 +20,18 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-
-      - name: Install yarn
-        uses: npm install -g yarn
-
       - name: Create env File
         run: |
           echo "${{ secrets.CLIENT_ENV }}" > ./packages/client/.env
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push image
         uses: docker/build-push-action@v5
@@ -57,3 +53,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-nginx:latest
             docker compose up -d nginx
+
+      # 3. Clean up Old Images
+      - name: Remove Dangling Images
+        run: docker image prune -f
