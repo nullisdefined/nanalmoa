@@ -15,6 +15,8 @@ import { PassportModule } from '@nestjs/passport'
 import { ManagerController } from './modules/manager/manager.controller'
 import { ManagerModule } from './modules/manager/manager.module'
 import { InvitationsModule } from './modules/invitations/invitations.module'
+import { DataSource } from 'typeorm'
+import { addTransactionalDataSource } from 'typeorm-transactional'
 
 @Module({
   imports: [
@@ -22,7 +24,18 @@ import { InvitationsModule } from './modules/invitations/invitations.module'
       isGlobal: true,
       envFilePath: `.${process.env.NODE_ENV}.env`,
     }),
-    TypeOrmModule.forRoot(dataSourceOptions),
+    TypeOrmModule.forRootAsync({
+      useFactory: () => ({
+        ...dataSourceOptions,
+        keepConnectionAlive: true,
+        autoLoadEntities: true,
+      }),
+      async dataSourceFactory(option) {
+        if (!option) throw new Error('Invalid options passed')
+
+        return addTransactionalDataSource(new DataSource(option))
+      },
+    }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       global: true,
