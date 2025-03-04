@@ -10,8 +10,9 @@ COPY packages/client/package.json ./client/
 COPY tsconfig.base.json ./packages/client/
 
 # 의존성 설치
-RUN yarn add -W -D typescript
+RUN yarn global add typescript
 RUN yarn install --frozen-lockfile
+RUN yarn run tsc --version
 
 # 소스 파일 복사 후 빌드
 COPY ./packages/client ./client
