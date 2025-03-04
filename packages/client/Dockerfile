@@ -4,7 +4,7 @@ FROM node:18-alpine AS build
 WORKDIR /app
 
 # 의존성 파일 복사
-COPY package.json yarn.lock ./
+COPY package.json yarn.lock tsconfig.base.json ./
 COPY packages/client/package.json ./client/
 
 # 의존성 설치
