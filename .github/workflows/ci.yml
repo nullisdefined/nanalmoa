@@ -1,81 +1,57 @@
-name: CI Pipeline
+name: Deploy to EC2 with Docker
 
-# 워크플로우가 실행될 조건 설정
 on:
-  # main 또는 release 브랜치에 push가 발생했을 때
-  # push:
-  #   branches: [main, release]
-  # main 또는 release 브랜치로 PR이 생성/수정되었을 때
-  pull_request:
-    branches: [main, release]
+  push:
+    branches:
+      - main
 
 jobs:
-  # 변경된 파일을 감지하는 작업
-  detect-changes:
+  deploy:
     runs-on: ubuntu-latest
-    # 이 작업의 출력을 다른 작업에서 사용할 수 있도록 설정 -> true/false값으로 변환해서 밑에서 해당 변수 활용
-    outputs:
-      client: ${{ steps.filter.outputs.client }}
-      server: ${{ steps.filter.outputs.server }}
+
     steps:
-      # 코드 체크아웃
-      - uses: actions/checkout@v3
-      # 변경된 파일 경로를 필터링하는 액션 실행
-      - uses: dorny/paths-filter@v2
-        id: filter
+      # 저장소 체크아웃
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Docker 로그인
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      # 환경 변수 파일 생성
+      - name: Create .env files
+        run: |
+          echo "${{ secrets.CLIENT_ENV }}" > ./packages/client/.env
+          echo "${{ secrets.SERVER_ENV }}" > ./packages/server/.env
+
+      # Client 빌드 & Push
+      - name: Build and Push Client Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/client:latest -f packages/client/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/client:latest
+
+      # Server 빌드 & Push
+      - name: Build and Push Server Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/server:latest -f packages/server/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/server:latest
+
+      # Nginx 빌드 & Push
+      - name: Build and Push Nginx Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/nginx:latest -f nginx/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/nginx:latest
+
+      # SSH로 EC2 접속 후 컨테이너 실행
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v0.1.6
         with:
-          filters: |
-            # client 패키지의 변경사항 감지
-            client:
-              - 'packages/client/**'
-            # server 패키지의 변경사항 감지
-            server:
-              - 'packages/server/**'
-            # 공통 설정 파일의 변경사항 감지
-            common:
-              - 'package.json'
-              - 'yarn.lock'
-
-  # 클라이언트 빌드 작업
-  client:
-    # detect-changes 작업이 완료된 후 실행
-    needs: detect-changes
-    # client 패키지가 변경되었을 때만 실행
-    if: ${{ needs.detect-changes.outputs.client == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      # 코드 체크아웃
-      - uses: actions/checkout@v3
-      # Node.js 환경 설정
-      - uses: actions/setup-node@v3
-        with:
-          # .nvmrc 파일에 지정된 Node.js 버전 사용
-          node-version-file: '.nvmrc'
-          # yarn 캐시 사용
-          cache: 'yarn'
-
-      # 의존성 설치 (--frozen-lockfile: yarn.lock 파일과 정확히 일치하는 버전 설치)
-      - name: Install Dependencies
-        run: yarn install --frozen-lockfile
-
-      # 클라이언트 빌드 실행
-      - name: Build Client
-        run: yarn build:client
-
-  # 서버 빌드 작업
-  server:
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.server == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'yarn'
-
-      - name: Install Dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Build Server
-        run: yarn build:server
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/client:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/server:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/nginx:latest
+            docker-compose -f /path/to/docker-compose.yml down
+            docker-compose -f /path/to/docker-compose.yml up -d
