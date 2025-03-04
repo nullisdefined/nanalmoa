@@ -12,6 +12,9 @@ RUN yarn install --frozen-lockfile
 
 # 소스 파일 복사 후 빌드
 COPY ./packages/client ./client
+
+# client 디렉토리로 이동 후 빌드 실행
+WORKDIR /app/client
 RUN yarn build
 
 # 2단계: Nginx 컨테이너에서 정적 파일 제공
