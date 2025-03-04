@@ -7,8 +7,10 @@ WORKDIR /app
 COPY package.json yarn.lock tsconfig.base.json ./
 COPY packages/client/package.json ./client/
 
+COPY tsconfig.base.json ./packages/client/
+
 # 의존성 설치
-RUN yarn global add typescript
+RUN yarn add -D typescript
 RUN yarn install --frozen-lockfile
 
 # 소스 파일 복사 후 빌드
