@@ -8,6 +8,7 @@ COPY package.json yarn.lock ./
 COPY packages/client/package.json ./client/
 
 # 의존성 설치
+RUN yarn global add typescript
 RUN yarn install --frozen-lockfile
 
 # 소스 파일 복사 후 빌드
