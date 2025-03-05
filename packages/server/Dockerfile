@@ -18,8 +18,8 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY package.json package-lock.json ./
 
-# 프로덕션 종속성만 설치
-RUN npm install --only=production
+# 의존성 설치
+RUN npm install
 
 # 환경 변수 적용
 COPY .env ./
