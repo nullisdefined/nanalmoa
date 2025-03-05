@@ -24,6 +24,10 @@ jobs:
           echo "${{ secrets.CLIENT_ENV }}" > ./packages/client/.env
           echo "${{ secrets.SERVER_ENV }}" > ./packages/server/.env
 
+      # Yarn 설치 (루트에서 workspace 설정 적용)
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+
       # Client 빌드 & Push
       - name: Build and Push Client Docker Image
         run: |
