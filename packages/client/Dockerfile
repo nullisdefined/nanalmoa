@@ -8,7 +8,7 @@ RUN yarn install --frozen-lockfile
 
 # 프로젝트 파일 복사 및 빌드 실행
 COPY . .
-RUN yarn build
+RUN yarn workspace client build
 
 # 2. Nginx를 사용하여 정적 파일 제공
 FROM nginx:alpine
