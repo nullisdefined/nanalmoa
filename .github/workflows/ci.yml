@@ -31,20 +31,20 @@ jobs:
       # Client 빌드 & Push
       - name: Build and Push Client Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/client:latest -f packages/client/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/client:latest
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-client:latest -f packages/client/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-client:latest
 
       # Server 빌드 & Push
       - name: Build and Push Server Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/server:latest -f packages/server/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/server:latest
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-server:latest -f packages/server/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-server:latest
 
       # Nginx 빌드 & Push
       - name: Build and Push Nginx Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/nginx:latest -f nginx/Dockerfile .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/nginx:latest
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-nginx:latest -f nginx/Dockerfile .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-nginx:latest
 
       # SSH로 EC2 접속 후 컨테이너 실행
       - name: Deploy to EC2
@@ -54,8 +54,8 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/client:latest
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/server:latest
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/nginx:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-client:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-server:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/nanalmoa-nginx:latest
             docker-compose -f /path/to/docker-compose.yml down
             docker-compose -f /path/to/docker-compose.yml up -d
