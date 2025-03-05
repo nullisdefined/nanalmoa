@@ -1,37 +1,27 @@
-# 1단계: 빌드 (Node.js 사용)
-FROM node:18-alpine AS build
-
+# 1. Node.js 환경에서 빌드 (Yarn 사용)
+FROM node:18 AS builder
 WORKDIR /app
 
-# 의존성 파일 복사
-COPY package.json yarn.lock tsconfig.base.json ./
-COPY packages/client/package.json ./client/
-
-COPY tsconfig.base.json ./packages/client/
-
-# 의존성 설치
-RUN yarn global add typescript
+# 종속성 설치
+COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
-RUN yarn run tsc --version
 
-# 소스 파일 복사 후 빌드
-COPY ./packages/client ./client
-
-# client 디렉토리로 이동 후 빌드 실행
-WORKDIR /app/client
+# 프로젝트 파일 복사 및 빌드 실행
+COPY . .
 RUN yarn build
 
-# 2단계: Nginx 컨테이너에서 정적 파일 제공
+# 2. Nginx를 사용하여 정적 파일 제공
 FROM nginx:alpine
-
 WORKDIR /usr/share/nginx/html
 
-# 빌드된 파일을 Nginx 정적 파일 경로로 복사
-COPY --from=build /app/client/dist .
+# 빌드된 정적 파일을 Nginx 컨테이너로 복사
+COPY --from=builder /app/dist ./
 
 # Nginx 설정 복사
-COPY ./nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80 443
+# 포트 설정
+EXPOSE 80
 
+# 컨테이너 실행 시 Nginx 실행
 CMD ["nginx", "-g", "daemon off;"]
