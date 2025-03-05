@@ -2,27 +2,30 @@
 FROM node:18 AS builder
 WORKDIR /app
 
+# 서버 관련 파일만 복사
+COPY packages/server/package.json packages/server/package-lock.json ./packages/server/
+WORKDIR /app/packages/server
+
 # 종속성 설치
-COPY package.json package-lock.json ./
 RUN npm install --frozen-lockfile
 
 # 프로젝트 파일 복사 및 빌드 실행
-COPY . .
+COPY packages/server ./packages/server
 RUN npm run build
 
 # 2. 런타임용 컨테이너 생성
 FROM node:18
-WORKDIR /app
+WORKDIR /app/packages/server
 
 # 빌드된 파일만 복사하여 최적화
-COPY --from=builder /app/dist ./dist
-COPY package.json package-lock.json ./
+COPY --from=builder /app/packages/server/dist ./dist
+COPY packages/server/package.json packages/server/package-lock.json ./
 
 # 의존성 설치
-RUN npm install
+RUN npm install --only=production
 
 # 환경 변수 적용
-COPY .env ./
+COPY packages/server/.env ./
 
 # 포트 개방
 EXPOSE 3333
